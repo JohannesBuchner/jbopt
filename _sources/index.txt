@@ -59,7 +59,7 @@ Installation
 
 	$ pip install jbopt # also consider the --user option
 
-#. Get source using git: *jbopt* is hosted at `https://github.com/JohannesBuchner/jbopt<https://github.com/JohannesBuchner/jbopt>`_
+#. Get source using git: *jbopt* is hosted at `<https://github.com/JohannesBuchner/jbopt>`_
 	::
 
 	$ git clone git://github.com/JohannesBuchner/jbopt
