@@ -44,7 +44,7 @@ So lets define the common arguments for re-use::
 		# disp = 1,  # for more verbose output
 	)
 
-Now we call the various methods, starting with the simple Nelder-Mead.
+Now we **call the various methods**, starting with the simple Nelder-Mead.
 See :doc:`doc` for which methods are available and how to call them::
 
 	ret = classical(method='neldermead', **args)
