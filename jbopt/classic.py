@@ -4,7 +4,8 @@ Classic optimization methods
 import numpy
 from independent import opt_grid_parallel, opt_grid
 
-def classical(transform, loglikelihood, parameter_names, start = 0.5, ftol=0.1, disp=0, nsteps=40000,
+def classical(transform, loglikelihood, parameter_names, prior, 
+	start = 0.5, ftol=0.1, disp=0, nsteps=40000,
 	method='neldermead', **args):
 	"""
 	**Classic optimization methods**

@@ -7,7 +7,7 @@ setup(
     author_email='buchner.johannes@gmx.at',
     packages=['jbopt'],
     scripts=[],
-    url='http://pypi.python.org/pypi/jbopt/',
+    url='http://johannesbuchner.github.io/jbopt/',
     license='LICENSE.txt',
     description='Parameter space exploration toolbox',
     long_description=open('README.rst').read(),
