@@ -125,7 +125,7 @@ def classical(transform, loglikelihood, parameter_names, prior,
 	return ret
 
 
-def onebyone(transform, loglikelihood, parameter_names, start = 0.5, ftol=0.1, disp=0, nsteps=40000,
+def onebyone(transform, loglikelihood, parameter_names, prior, start = 0.5, ftol=0.1, disp=0, nsteps=40000,
 	parallel=False, find_uncertainties=False, **args):
 	"""
 	**Convex optimization based on Brent's method**
