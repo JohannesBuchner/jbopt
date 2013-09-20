@@ -55,64 +55,83 @@
             
   <div class="section" id="example-code">
 <h1>Example code<a class="headerlink" href="#example-code" title="Permalink to this headline">¶</a></h1>
-<p>See <a class="reference internal" href="doc.html"><em>API documentation</em></a> for which methods are available and how to call them.</p>
-<div class="highlight-python"><div class="highlight"><pre><span class="c"># define the problem:</span>
-
-<span class="c">#   the log-likelihood function</span>
-<span class="c">#   use a 5-dimensional gaussian likelihood surface</span>
-<span class="n">centers</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">0.1</span><span class="p">,</span> <span class="mi">15</span><span class="p">,</span> <span class="mf">3.3</span><span class="p">,</span> <span class="mf">4.1</span><span class="p">,</span> <span class="mi">0</span><span class="p">])</span>
+<p>First, lets define the problem.</p>
+<p>We will use the <strong>log-likelihood function</strong> of a 5-dimensional gaussian likelihood surface:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="n">centers</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">0.1</span><span class="p">,</span> <span class="mi">15</span><span class="p">,</span> <span class="mf">3.3</span><span class="p">,</span> <span class="mf">4.1</span><span class="p">,</span> <span class="mi">0</span><span class="p">])</span>
 <span class="n">sigmas</span>  <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">0.01</span><span class="p">,</span> <span class="mf">0.1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">10</span><span class="p">,</span> <span class="mi">10</span><span class="p">])</span>
+
 <span class="k">def</span> <span class="nf">loglikelihood</span><span class="p">(</span><span class="n">params</span><span class="p">):</span>
         <span class="k">return</span> <span class="o">-</span><span class="mf">0.5</span> <span class="o">*</span> <span class="p">(((</span><span class="n">params</span> <span class="o">-</span> <span class="n">centers</span><span class="p">)</span> <span class="o">/</span> <span class="n">sigmas</span><span class="p">)</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
-
-<span class="c">#   define the parameter space, in this case between -50 and +50</span>
-<span class="c">#   also used in Bayesian methods for prior weighting</span>
-<span class="k">def</span> <span class="nf">transform</span><span class="p">(</span><span class="n">cube</span><span class="p">):</span>
+</pre></div>
+</div>
+<p>Next, we define the <strong>parameter space</strong>, in this case between -50 and +50.
+This function is also used in Bayesian methods for prior weighting:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="k">def</span> <span class="nf">transform</span><span class="p">(</span><span class="n">cube</span><span class="p">):</span>
         <span class="k">return</span> <span class="n">numpy</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">cube</span><span class="p">)</span> <span class="o">*</span> <span class="mi">100</span> <span class="o">-</span> <span class="mi">50</span>
-
-<span class="c">#   define the prior weighting explicitly for some of the Bayesian methods</span>
-<span class="c">#   in this case uniform between -50 and +50</span>
-<span class="k">def</span> <span class="nf">prior</span><span class="p">(</span><span class="n">params</span><span class="p">):</span>
+</pre></div>
+</div>
+<p>We also define the <strong>prior weighting</strong> explicitly for some of the Bayesian methods;
+Other methods will not use it. Again, in this case we consider a uniform prior:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="k">def</span> <span class="nf">prior</span><span class="p">(</span><span class="n">params</span><span class="p">):</span>
         <span class="k">return</span> <span class="mi">0</span>
-
-<span class="kn">from</span> <span class="nn">jbopt.classic</span> <span class="kn">import</span> <span class="o">*</span>
+</pre></div>
+</div>
+<p>Some imports:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="kn">from</span> <span class="nn">jbopt.classic</span> <span class="kn">import</span> <span class="o">*</span>
 <span class="kn">from</span> <span class="nn">jbopt.mcmc</span> <span class="kn">import</span> <span class="o">*</span>
 <span class="kn">from</span> <span class="nn">jbopt.mn</span> <span class="kn">import</span> <span class="o">*</span>
 <span class="kn">from</span> <span class="nn">jbopt.de</span> <span class="kn">import</span> <span class="o">*</span>
-
-<span class="c"># the common parameters</span>
+</pre></div>
+</div>
+<p>All methods have arguments in common, namely the loglikelihood, transform and prior
+defined above. Also, the maximum number of steps is obeyed by most algorithms.
+So lets define the common arguments for re-use:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="c"># the common parameters</span>
 <span class="n">args</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span>
         <span class="n">loglikelihood</span><span class="o">=</span><span class="n">loglikelihood</span><span class="p">,</span> <span class="n">transform</span><span class="o">=</span><span class="n">transform</span><span class="p">,</span> <span class="n">prior</span><span class="o">=</span><span class="n">prior</span><span class="p">,</span>
         <span class="n">parameter_names</span> <span class="o">=</span> <span class="p">[</span><span class="s">&#39;c</span><span class="si">%d</span><span class="s">&#39;</span> <span class="o">%</span> <span class="n">i</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">centers</span><span class="p">))],</span>
-        <span class="n">nsteps</span><span class="o">=</span><span class="mi">2000</span><span class="p">,</span> <span class="c"># maximum number of steps</span>
-        <span class="n">seed</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span>    <span class="c"># make output reproducible; set to -1 for random seed</span>
-        <span class="c"># disp = 1 # for more verbose output</span>
+        <span class="n">nsteps</span><span class="o">=</span><span class="mi">2000</span><span class="p">,</span> <span class="c"># maximum number of likelihood evaluations</span>
+        <span class="c"># start = [0.5, 0.3, 0.5, 0.7, 0.9], # set starting point</span>
+        <span class="c"># seed = 0,  # set for reproducible output</span>
+        <span class="c"># disp = 1,  # for more verbose output</span>
 <span class="p">)</span>
-
-<span class="c"># calling the various methods (common call interface)</span>
-<span class="n">ret</span> <span class="o">=</span> <span class="n">classical</span><span class="p">(</span><span class="n">method</span><span class="o">=</span><span class="s">&#39;neldermead&#39;</span><span class="p">,</span> <span class="o">**</span><span class="n">args</span><span class="p">)</span>
-
-<span class="k">for</span> <span class="n">method</span> <span class="ow">in</span> <span class="s">&#39;cobyla&#39;</span><span class="p">,</span> <span class="s">&#39;ralg&#39;</span><span class="p">,</span> <span class="s">&#39;mma&#39;</span><span class="p">,</span> <span class="s">&#39;auglag&#39;</span><span class="p">,</span> <span class="s">&#39;minuit&#39;</span><span class="p">:</span>
+</pre></div>
+</div>
+<p>Now we call the various methods, starting with the simple Nelder-Mead.
+See <a class="reference internal" href="doc.html"><em>API documentation</em></a> for which methods are available and how to call them:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="n">ret</span> <span class="o">=</span> <span class="n">classical</span><span class="p">(</span><span class="n">method</span><span class="o">=</span><span class="s">&#39;neldermead&#39;</span><span class="p">,</span> <span class="o">**</span><span class="n">args</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Minuit, COBYLA and some methods through OpenOpt:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="k">for</span> <span class="n">method</span> <span class="ow">in</span> <span class="s">&#39;cobyla&#39;</span><span class="p">,</span> <span class="s">&#39;ralg&#39;</span><span class="p">,</span> <span class="s">&#39;mma&#39;</span><span class="p">,</span> <span class="s">&#39;auglag&#39;</span><span class="p">,</span> <span class="s">&#39;minuit&#39;</span><span class="p">:</span>
         <span class="k">print</span> <span class="s">&#39;next method:&#39;</span><span class="p">,</span> <span class="n">method</span>
         <span class="n">ret</span> <span class="o">=</span> <span class="n">classical</span><span class="p">(</span><span class="n">method</span><span class="o">=</span><span class="n">method</span><span class="p">,</span> <span class="o">**</span><span class="n">args</span><span class="p">)</span>
-
-<span class="n">ret</span> <span class="o">=</span> <span class="n">onebyone</span><span class="p">(</span><span class="o">**</span><span class="n">args</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>A custom algorithm:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="n">ret</span> <span class="o">=</span> <span class="n">onebyone</span><span class="p">(</span><span class="o">**</span><span class="n">args</span><span class="p">)</span>
 <span class="n">ret</span> <span class="o">=</span> <span class="n">onebyone</span><span class="p">(</span><span class="n">parallel</span><span class="o">=</span><span class="bp">True</span><span class="p">,</span> <span class="n">find_uncertainties</span><span class="o">=</span><span class="bp">True</span><span class="p">,</span> <span class="o">**</span><span class="n">args</span><span class="p">)</span>
-<span class="n">ret</span> <span class="o">=</span> <span class="n">de</span><span class="p">(</span><span class="n">output_basename</span><span class="o">=</span><span class="s">&#39;test_all_de&#39;</span><span class="p">,</span> <span class="o">**</span><span class="n">args</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Differential evolution, MCMC, Ensemble MCMC and MultiNest:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="n">ret</span> <span class="o">=</span> <span class="n">de</span><span class="p">(</span><span class="n">output_basename</span><span class="o">=</span><span class="s">&#39;test_all_de&#39;</span><span class="p">,</span> <span class="o">**</span><span class="n">args</span><span class="p">)</span>
 <span class="n">ret</span> <span class="o">=</span> <span class="n">mcmc</span><span class="p">(</span><span class="n">output_basename</span><span class="o">=</span><span class="s">&#39;test_all_mcmc&#39;</span><span class="p">,</span> <span class="o">**</span><span class="n">args</span><span class="p">)</span>
 <span class="n">ret</span> <span class="o">=</span> <span class="n">ensemble</span><span class="p">(</span><span class="n">output_basename</span><span class="o">=</span><span class="s">&#39;test_all_mcmc&#39;</span><span class="p">,</span> <span class="o">**</span><span class="n">args</span><span class="p">)</span>
 <span class="n">ret</span> <span class="o">=</span> <span class="n">multinest</span><span class="p">(</span><span class="n">output_basename</span><span class="o">=</span><span class="s">&#39;test_all_mn&#39;</span><span class="p">,</span> <span class="o">**</span><span class="n">args</span><span class="p">)</span>
-
-<span class="c"># analyse a return value (common output interface)</span>
-<span class="k">print</span> <span class="n">ret</span><span class="p">[</span><span class="s">&#39;method&#39;</span><span class="p">]</span> <span class="c"># method used</span>
-<span class="k">print</span> <span class="n">ret</span><span class="p">[</span><span class="s">&#39;start&#39;</span><span class="p">]</span>  <span class="c"># new ML value</span>
+</pre></div>
+</div>
+<p>For each, we can analyse the return value, which gives information about what was
+learned about the parameter space. This of course varies between the methods:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="k">print</span> <span class="n">ret</span><span class="p">[</span><span class="s">&#39;method&#39;</span><span class="p">]</span> <span class="c"># method used</span>
+<span class="k">print</span> <span class="n">ret</span><span class="p">[</span><span class="s">&#39;start&#39;</span><span class="p">]</span>  <span class="c"># new maximum likelihood value</span>
 <span class="k">print</span> <span class="n">ret</span><span class="p">[</span><span class="s">&#39;neval&#39;</span><span class="p">]</span>  <span class="c"># number of evaluations used</span>
-<span class="c"># not all methods provide also the following</span>
+<span class="c"># some methods also provide the following</span>
 <span class="k">print</span> <span class="n">ret</span><span class="p">[</span><span class="s">&#39;chain&#39;</span><span class="p">]</span>  <span class="c"># Markov Chain, samples drawn from posterior</span>
 <span class="k">print</span> <span class="n">ret</span><span class="p">[</span><span class="s">&#39;median&#39;</span><span class="p">]</span> <span class="c"># medians of the parameters</span>
 <span class="k">print</span> <span class="n">ret</span><span class="p">[</span><span class="s">&#39;stdev&#39;</span><span class="p">]</span>  <span class="c"># standard deviation uncertainty of the parameters</span>
 </pre></div>
 </div>
+<p>Read more in the <a class="reference internal" href="doc.html"><em>API documentation</em></a>.</p>
 </div>
 
 

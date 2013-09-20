@@ -10,7 +10,9 @@ About
 Methods of likelihood maximization, estimation of uncertainty for parameter estimation
 in a maximum likelihood and Bayesian way are available. 
 The problem only has to be stated once, then the various methods can called 
-interchangably, or in combination, by a common call interface (see the :doc:`code example<example>`).
+interchangably, or in combination, by a common call interface.
+
+Take a look at the :doc:`instructive code example <example>`.
 
 Methods
 ---------
