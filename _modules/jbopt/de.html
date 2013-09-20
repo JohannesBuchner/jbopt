@@ -1,0 +1,237 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>jbopt.de &mdash; jbopt 0.1 documentation</title>
+    
+    <link rel="stylesheet" href="../../_static/nature.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../',
+        VERSION:     '0.1',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../_static/doctools.js"></script>
+    <link rel="top" title="jbopt 0.1 documentation" href="../../index.html" />
+    <link rel="up" title="jbopt" href="../jbopt.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li><a href="../../index.html">jbopt 0.1 documentation</a> &raquo;</li>
+          <li><a href="../index.html" >Module code</a> &raquo;</li>
+          <li><a href="../jbopt.html" accesskey="U">jbopt</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <h1>Source code for jbopt.de</h1><div class="highlight"><pre>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Differential evolution</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="kn">import</span> <span class="nn">numpy</span>
+
+<div class="viewcode-block" id="de"><a class="viewcode-back" href="../../doc.html#jbopt.de.de">[docs]</a><span class="k">def</span> <span class="nf">de</span><span class="p">(</span><span class="n">output_basename</span><span class="p">,</span> <span class="n">parameter_names</span><span class="p">,</span> <span class="n">transform</span><span class="p">,</span> <span class="n">loglikelihood</span><span class="p">,</span> <span class="n">prior</span><span class="p">,</span> <span class="n">nsteps</span><span class="o">=</span><span class="mi">40000</span><span class="p">,</span> <span class="n">vizfunc</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">printfunc</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="o">**</span><span class="n">problem</span><span class="p">):</span>
+	<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">	Differential evolution</span>
+<span class="sd"> 	</span>
+<span class="sd"> 	via `inspyred &lt;http://inspyred.github.io/&gt;`_</span>
+<span class="sd"> 	</span>
+<span class="sd"> 	specially tuned. steady state replacement, n-point crossover, </span>
+<span class="sd"> 		pop size 20, gaussian mutation noise 0.01 &amp; 1e-6.</span>
+<span class="sd"> 	stores intermediate results (can be used for resume, see seeds)</span>
+<span class="sd"> 	</span>
+<span class="sd"> 	@start: start point</span>
+<span class="sd"> 	@seeds: list of start points</span>
+<span class="sd"> 	@vizfunc: callback to do visualization of current best solution</span>
+<span class="sd"> 	@printfunc: callback to summarize current best solution</span>
+<span class="sd"> 	@seed: RNG initialization (if set)</span>
+<span class="sd"> 	</span>
+<span class="sd">	&quot;&quot;&quot;</span>
+	<span class="kn">import</span> <span class="nn">json</span>
+	<span class="kn">import</span> <span class="nn">inspyred</span>
+	<span class="kn">import</span> <span class="nn">random</span>
+	<span class="n">prng</span> <span class="o">=</span> <span class="n">random</span><span class="o">.</span><span class="n">Random</span><span class="p">()</span>
+	<span class="k">if</span> <span class="s">&#39;seed&#39;</span> <span class="ow">in</span> <span class="n">problem</span><span class="p">:</span>
+		<span class="n">prng</span><span class="o">.</span><span class="n">seed</span><span class="p">(</span><span class="n">problem</span><span class="p">[</span><span class="s">&#39;seed&#39;</span><span class="p">])</span>
+	
+	<span class="n">n_params</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">parameter_names</span><span class="p">)</span>
+	<span class="n">seeds</span> <span class="o">=</span> <span class="n">problem</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s">&#39;seeds&#39;</span><span class="p">,</span> <span class="p">[])</span>
+	<span class="k">if</span> <span class="s">&#39;start&#39;</span> <span class="ow">in</span> <span class="n">problem</span><span class="p">:</span>
+		<span class="n">seeds</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">problem</span><span class="p">[</span><span class="s">&#39;start&#39;</span><span class="p">])</span>
+	<span class="n">prefix</span> <span class="o">=</span> <span class="n">output_basename</span>
+	
+	<span class="k">def</span> <span class="nf">viz</span><span class="p">(</span><span class="n">candidate</span><span class="p">,</span> <span class="n">args</span><span class="p">):</span>
+		<span class="k">if</span> <span class="n">vizfunc</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
+			<span class="n">vizfunc</span><span class="p">(</span><span class="n">candidate</span><span class="p">)</span>
+	<span class="k">def</span> <span class="nf">print_candidate</span><span class="p">(</span><span class="n">candidate</span><span class="p">,</span> <span class="n">l</span><span class="p">,</span> <span class="n">args</span><span class="p">):</span>
+		<span class="k">if</span> <span class="n">printfunc</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
+			<span class="n">printfunc</span><span class="p">(</span><span class="n">cube</span><span class="o">=</span><span class="n">candidate</span><span class="p">,</span> <span class="n">loglikelihood</span><span class="o">=</span><span class="n">l</span><span class="p">)</span>
+		<span class="k">else</span><span class="p">:</span>
+			<span class="k">print</span> <span class="n">l</span><span class="p">,</span> <span class="n">candidate</span>
+	<span class="k">def</span> <span class="nf">eval_candidate</span><span class="p">(</span><span class="n">candidate</span><span class="p">):</span>
+		<span class="n">params</span> <span class="o">=</span> <span class="n">transform</span><span class="p">(</span><span class="n">candidate</span><span class="p">)</span>
+		<span class="n">l</span> <span class="o">=</span> <span class="n">loglikelihood</span><span class="p">(</span><span class="n">params</span><span class="p">)</span>
+		<span class="n">p</span> <span class="o">=</span> <span class="n">prior</span><span class="p">(</span><span class="n">params</span><span class="p">)</span>
+		<span class="k">if</span> <span class="n">numpy</span><span class="o">.</span><span class="n">isinf</span><span class="p">(</span><span class="n">p</span><span class="p">)</span> <span class="ow">and</span> <span class="n">p</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">:</span>
+			<span class="k">print</span> <span class="s">&#39;    prior rejection&#39;</span>
+			<span class="k">return</span> <span class="o">-</span><span class="mf">1e300</span>
+		<span class="k">if</span> <span class="n">numpy</span><span class="o">.</span><span class="n">isnan</span><span class="p">(</span><span class="n">l</span><span class="p">):</span>
+			<span class="k">return</span> <span class="o">-</span><span class="mf">1e300</span>
+		<span class="k">return</span> <span class="n">l</span><span class="p">,</span> <span class="n">p</span>
+	<span class="nd">@inspyred.ec.utilities.memoize</span>
+	<span class="nd">@inspyred.ec.evaluators.evaluator</span>
+	<span class="k">def</span> <span class="nf">fitness</span><span class="p">(</span><span class="n">candidate</span><span class="p">,</span> <span class="n">args</span><span class="p">):</span>
+		<span class="n">l</span><span class="p">,</span> <span class="n">p</span> <span class="o">=</span> <span class="n">eval_candidate</span><span class="p">(</span><span class="n">candidate</span><span class="p">)</span>
+		<span class="c">#print_candidate(candidate, (l + p), args)</span>
+		<span class="k">return</span> <span class="p">(</span><span class="n">l</span> <span class="o">+</span> <span class="n">p</span><span class="p">)</span>
+
+	<span class="n">cutoff_store</span> <span class="o">=</span> <span class="mi">10</span>
+	<span class="k">def</span> <span class="nf">solution_archiver</span><span class="p">(</span><span class="n">random</span><span class="p">,</span> <span class="n">population</span><span class="p">,</span> <span class="n">archive</span><span class="p">,</span> <span class="n">args</span><span class="p">):</span>
+		<span class="n">psize</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">population</span><span class="p">)</span>
+		<span class="n">population</span><span class="o">.</span><span class="n">sort</span><span class="p">(</span><span class="n">reverse</span><span class="o">=</span><span class="bp">True</span><span class="p">)</span>
+		<span class="n">best</span> <span class="o">=</span> <span class="n">population</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">fitness</span>
+		<span class="c">#print &#39;BEST: &#39;, best, </span>
+		<span class="n">all_candidates</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">population</span> <span class="o">+</span> <span class="n">archive</span><span class="p">,</span> <span class="n">reverse</span><span class="o">=</span><span class="bp">True</span><span class="p">)</span>
+		<span class="n">all_fitness</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">c</span><span class="o">.</span><span class="n">fitness</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">all_candidates</span><span class="p">])</span>
+		<span class="n">mask</span> <span class="o">=</span> <span class="n">best</span> <span class="o">-</span> <span class="n">all_fitness</span> <span class="o">&gt;</span> <span class="n">cutoff_store</span> <span class="o">/</span> <span class="mi">3</span>
+		<span class="k">if</span> <span class="n">mask</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span> <span class="o">&lt;</span> <span class="mi">20</span><span class="p">:</span>
+			<span class="n">mask</span> <span class="o">=</span> <span class="n">best</span> <span class="o">-</span> <span class="n">all_fitness</span> <span class="o">&gt;</span> <span class="n">cutoff_store</span>
+		<span class="n">newarchive</span> <span class="o">=</span> <span class="p">[</span><span class="n">c</span> <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">c</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">all_candidates</span><span class="p">)</span> <span class="k">if</span> <span class="n">i</span> <span class="o">==</span> <span class="mi">0</span> <span class="ow">or</span> <span class="n">all_fitness</span><span class="p">[</span><span class="n">i</span> <span class="o">-</span> <span class="mi">1</span><span class="p">]</span> <span class="o">!=</span> <span class="n">c</span><span class="o">.</span><span class="n">fitness</span><span class="p">]</span>
+		<span class="k">print</span> <span class="s">&#39;ARCHIVE: &#39;</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">archive</span><span class="p">),</span> <span class="nb">len</span><span class="p">(</span><span class="n">newarchive</span><span class="p">)</span>
+		<span class="n">json</span><span class="o">.</span><span class="n">dump</span><span class="p">([{</span><span class="s">&#39;candidate&#39;</span><span class="p">:</span> <span class="p">[</span><span class="nb">float</span><span class="p">(</span><span class="n">f</span><span class="p">)</span> <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">c</span><span class="o">.</span><span class="n">candidate</span><span class="p">],</span> <span class="s">&#39;fitness&#39;</span><span class="p">:</span><span class="n">c</span><span class="o">.</span><span class="n">fitness</span><span class="p">}</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">newarchive</span><span class="p">],</span> 
+			<span class="nb">open</span><span class="p">(</span><span class="n">prefix</span> <span class="o">+</span> <span class="s">&#39;_values.json&#39;</span><span class="p">,</span> <span class="s">&#39;w&#39;</span><span class="p">),</span> <span class="n">indent</span><span class="o">=</span><span class="mi">4</span><span class="p">)</span>
+		<span class="k">return</span> <span class="n">newarchive</span>
+	
+	<span class="k">def</span> <span class="nf">observer</span><span class="p">(</span><span class="n">population</span><span class="p">,</span> <span class="n">num_generations</span><span class="p">,</span> <span class="n">num_evaluations</span><span class="p">,</span> <span class="n">args</span><span class="p">):</span>
+		<span class="n">population</span><span class="o">.</span><span class="n">sort</span><span class="p">(</span><span class="n">reverse</span><span class="o">=</span><span class="bp">True</span><span class="p">)</span>
+		<span class="n">candidate</span> <span class="o">=</span> <span class="n">population</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+		<span class="k">print</span> <span class="p">(</span><span class="s">&#39;{0} evaluations&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">num_evaluations</span><span class="p">)),</span> <span class="s">&#39; best:&#39;</span><span class="p">,</span> 
+		<span class="n">print_candidate</span><span class="p">(</span><span class="n">candidate</span><span class="o">.</span><span class="n">candidate</span><span class="p">,</span> <span class="n">candidate</span><span class="o">.</span><span class="n">fitness</span><span class="p">,</span> <span class="n">args</span><span class="p">)</span>
+		<span class="k">if</span> <span class="n">num_evaluations</span> <span class="o">%</span> <span class="nb">len</span><span class="p">(</span><span class="n">population</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span> <span class="ow">or</span> <span class="n">num_evaluations</span> <span class="o">&lt;</span> <span class="nb">len</span><span class="p">(</span><span class="n">population</span><span class="p">)</span> <span class="ow">or</span> <span class="n">args</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s">&#39;force_viz&#39;</span><span class="p">,</span> <span class="bp">False</span><span class="p">):</span>
+			<span class="c"># for each turnaround of a full generation</span>
+			<span class="n">viz</span><span class="p">(</span><span class="n">candidate</span><span class="o">.</span><span class="n">candidate</span><span class="p">,</span> <span class="n">args</span><span class="p">)</span>
+	
+	<span class="k">def</span> <span class="nf">generator</span><span class="p">(</span><span class="n">random</span><span class="p">,</span> <span class="n">args</span><span class="p">):</span> 
+		<span class="n">u</span> <span class="o">=</span> <span class="p">[</span><span class="n">random</span><span class="o">.</span><span class="n">uniform</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span> <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n_params</span><span class="p">)]</span>
+		<span class="n">u</span> <span class="o">=</span> <span class="p">[</span><span class="n">random</span><span class="o">.</span><span class="n">gauss</span><span class="p">(</span><span class="mf">0.5</span><span class="p">,</span> <span class="mf">0.1</span><span class="p">)</span> <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n_params</span><span class="p">)]</span>
+		<span class="k">return</span> <span class="n">bounder</span><span class="p">(</span><span class="n">u</span><span class="p">,</span> <span class="n">args</span><span class="p">)</span>
+	
+	<span class="n">ea</span> <span class="o">=</span> <span class="n">inspyred</span><span class="o">.</span><span class="n">ec</span><span class="o">.</span><span class="n">DEA</span><span class="p">(</span><span class="n">prng</span><span class="p">)</span>
+	<span class="n">ea</span><span class="o">.</span><span class="n">terminator</span> <span class="o">=</span> <span class="n">inspyred</span><span class="o">.</span><span class="n">ec</span><span class="o">.</span><span class="n">terminators</span><span class="o">.</span><span class="n">evaluation_termination</span>
+	<span class="n">ea</span><span class="o">.</span><span class="n">archiver</span> <span class="o">=</span> <span class="n">solution_archiver</span>
+	<span class="n">bounder</span> <span class="o">=</span> <span class="n">inspyred</span><span class="o">.</span><span class="n">ec</span><span class="o">.</span><span class="n">Bounder</span><span class="p">(</span><span class="n">lower_bound</span><span class="o">=</span><span class="mf">1e-10</span><span class="p">,</span> <span class="n">upper_bound</span><span class="o">=</span><span class="mi">1</span><span class="o">-</span><span class="mf">1e-10</span><span class="p">)</span>
+	<span class="c">#bounder = inspyred.ec.Bounder(lower_bound=-20, upper_bound=20)</span>
+	<span class="kn">import</span> <span class="nn">copy</span>
+	<span class="kn">from</span> <span class="nn">math</span> <span class="kn">import</span> <span class="n">log</span>
+	<span class="nd">@inspyred.ec.variators.mutator</span>
+	<span class="k">def</span> <span class="nf">double_exponential_mutation</span><span class="p">(</span><span class="n">random</span><span class="p">,</span> <span class="n">candidate</span><span class="p">,</span> <span class="n">args</span><span class="p">):</span>
+		<span class="n">mut_rate</span> <span class="o">=</span> <span class="n">args</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s">&#39;mutation_rate&#39;</span><span class="p">,</span> <span class="mf">0.1</span><span class="p">)</span>
+		<span class="n">mean</span> <span class="o">=</span> <span class="n">args</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s">&#39;gaussian_mean&#39;</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">)</span>
+		<span class="n">stdev</span> <span class="o">=</span> <span class="n">args</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s">&#39;gaussian_stdev&#39;</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">)</span>
+		<span class="n">scale</span> <span class="o">=</span> <span class="n">log</span><span class="p">(</span><span class="mf">0.5</span><span class="p">)</span> <span class="o">/</span> <span class="o">-</span> <span class="p">(</span><span class="n">stdev</span><span class="p">)</span>
+		<span class="n">bounder</span> <span class="o">=</span> <span class="n">args</span><span class="p">[</span><span class="s">&#39;_ec&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">bounder</span>
+		<span class="n">mutant</span> <span class="o">=</span> <span class="n">copy</span><span class="o">.</span><span class="n">copy</span><span class="p">(</span><span class="n">candidate</span><span class="p">)</span>
+		<span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">m</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">mutant</span><span class="p">):</span>
+			<span class="n">dice</span> <span class="o">=</span> <span class="n">random</span><span class="o">.</span><span class="n">random</span><span class="p">()</span>
+			<span class="k">if</span> <span class="n">dice</span> <span class="o">&lt;</span> <span class="n">mut_rate</span><span class="p">:</span>
+				<span class="n">sign</span> <span class="o">=</span> <span class="p">(</span><span class="n">dice</span> <span class="o">&lt;</span> <span class="n">mut_rate</span> <span class="o">/</span> <span class="mi">2</span><span class="p">)</span> <span class="o">*</span> <span class="mi">2</span> <span class="o">-</span> <span class="mi">1</span>
+				<span class="n">delta</span> <span class="o">=</span> <span class="o">-</span><span class="n">log</span><span class="p">(</span><span class="n">random</span><span class="o">.</span><span class="n">random</span><span class="p">())</span> <span class="o">/</span> <span class="n">scale</span>
+				<span class="n">mutant</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">+=</span> <span class="n">delta</span> <span class="o">*</span> <span class="n">sign</span>
+			<span class="n">mutant</span> <span class="o">=</span> <span class="n">bounder</span><span class="p">(</span><span class="n">mutant</span><span class="p">,</span> <span class="n">args</span><span class="p">)</span>
+		<span class="k">return</span> <span class="n">mutant</span>
+	
+	<span class="k">def</span> <span class="nf">minute_gaussian_mutation</span><span class="p">(</span><span class="n">random</span><span class="p">,</span> <span class="n">candidates</span><span class="p">,</span> <span class="n">args</span><span class="p">):</span>
+		<span class="n">args</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">args</span><span class="p">)</span>
+		<span class="n">args</span><span class="p">[</span><span class="s">&#39;mutation_rate&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="mi">1</span>
+		<span class="n">args</span><span class="p">[</span><span class="s">&#39;gaussian_stdev&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="mf">1e-6</span>
+		<span class="k">return</span> <span class="n">inspyred</span><span class="o">.</span><span class="n">ec</span><span class="o">.</span><span class="n">variators</span><span class="o">.</span><span class="n">gaussian_mutation</span><span class="p">(</span><span class="n">random</span><span class="p">,</span> <span class="n">candidates</span><span class="p">,</span> <span class="n">args</span><span class="p">)</span>
+	<span class="n">ea</span><span class="o">.</span><span class="n">variator</span> <span class="o">=</span> <span class="p">[</span><span class="n">inspyred</span><span class="o">.</span><span class="n">ec</span><span class="o">.</span><span class="n">variators</span><span class="o">.</span><span class="n">n_point_crossover</span><span class="p">,</span> <span class="n">inspyred</span><span class="o">.</span><span class="n">ec</span><span class="o">.</span><span class="n">variators</span><span class="o">.</span><span class="n">gaussian_mutation</span><span class="p">,</span> <span class="n">minute_gaussian_mutation</span><span class="p">]</span>
+	<span class="c">#ea.variator = [inspyred.ec.variators.n_point_crossover, double_exponential_mutation]</span>
+	
+	<span class="n">ea</span><span class="o">.</span><span class="n">replacer</span> <span class="o">=</span> <span class="n">inspyred</span><span class="o">.</span><span class="n">ec</span><span class="o">.</span><span class="n">replacers</span><span class="o">.</span><span class="n">steady_state_replacement</span>
+	<span class="n">ea</span><span class="o">.</span><span class="n">observer</span> <span class="o">=</span> <span class="n">observer</span>
+	
+	<span class="n">pop_size</span> <span class="o">=</span> <span class="mi">20</span>
+	
+	<span class="n">final_pop</span> <span class="o">=</span> <span class="n">ea</span><span class="o">.</span><span class="n">evolve</span><span class="p">(</span><span class="n">pop_size</span><span class="o">=</span><span class="n">pop_size</span><span class="p">,</span> 
+		<span class="n">max_evaluations</span><span class="o">=</span><span class="n">nsteps</span><span class="p">,</span> <span class="n">maximize</span><span class="o">=</span><span class="bp">True</span><span class="p">,</span> <span class="n">seeds</span><span class="o">=</span><span class="n">seeds</span><span class="p">,</span> 
+		<span class="n">gaussian_stdev</span><span class="o">=</span><span class="mf">0.01</span><span class="p">,</span> <span class="c">#mutation_rate=0.3,</span>
+		<span class="n">bounder</span><span class="o">=</span><span class="n">bounder</span><span class="p">,</span> <span class="n">generator</span><span class="o">=</span><span class="n">generator</span><span class="p">,</span> <span class="n">evaluator</span><span class="o">=</span><span class="n">fitness</span><span class="p">,</span>
+		<span class="p">)</span>
+	
+	<span class="n">best</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">final_pop</span><span class="p">)</span>
+	<span class="n">seeds</span> <span class="o">=</span> <span class="p">[</span><span class="n">c</span><span class="o">.</span><span class="n">candidate</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">ea</span><span class="o">.</span><span class="n">archive</span><span class="p">]</span>
+	<span class="k">print</span> <span class="s">&#39;final candidate:&#39;</span><span class="p">,</span> <span class="n">best</span>
+	
+	
+	<span class="k">return</span> <span class="p">{</span><span class="s">&#39;start&#39;</span><span class="p">:</span> <span class="n">best</span><span class="o">.</span><span class="n">candidate</span><span class="p">,</span> <span class="s">&#39;value&#39;</span><span class="p">:</span> <span class="n">best</span><span class="o">.</span><span class="n">fitness</span><span class="p">,</span>
+		<span class="s">&#39;seeds&#39;</span><span class="p">:</span> <span class="n">seeds</span><span class="p">,</span> <span class="s">&#39;method&#39;</span><span class="p">:</span> <span class="s">&#39;DE&#39;</span><span class="p">}</span>
+	
+</pre></div></div>
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li><a href="../../index.html">jbopt 0.1 documentation</a> &raquo;</li>
+          <li><a href="../index.html" >Module code</a> &raquo;</li>
+          <li><a href="../jbopt.html" >jbopt</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright 2013, Johannes Buchner.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.1.3.
+    </div>
+  </body>
+</html>

@@ -1,0 +1,508 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>jbopt.optimize1d &mdash; jbopt 0.1 documentation</title>
+    
+    <link rel="stylesheet" href="../../_static/nature.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../',
+        VERSION:     '0.1',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../_static/doctools.js"></script>
+    <link rel="top" title="jbopt 0.1 documentation" href="../../index.html" />
+    <link rel="up" title="jbopt" href="../jbopt.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li><a href="../../index.html">jbopt 0.1 documentation</a> &raquo;</li>
+          <li><a href="../index.html" >Module code</a> &raquo;</li>
+          <li><a href="../jbopt.html" accesskey="U">jbopt</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <h1>Source code for jbopt.optimize1d</h1><div class="highlight"><pre>
+<span class="kn">import</span> <span class="nn">scipy.optimize</span><span class="o">,</span> <span class="nn">scipy.interpolate</span>
+<span class="kn">import</span> <span class="nn">numpy</span>
+<span class="kn">import</span> <span class="nn">matplotlib.pyplot</span> <span class="kn">as</span> <span class="nn">plt</span>
+
+<span class="k">def</span> <span class="nf">pause</span><span class="p">():</span>
+	<span class="kn">import</span> <span class="nn">sys</span>
+	<span class="k">print</span> <span class="s">&#39;please press enter: &gt;&gt; &#39;</span><span class="p">,</span>
+	<span class="n">sys</span><span class="o">.</span><span class="n">stdin</span><span class="o">.</span><span class="n">readline</span><span class="p">()</span>
+
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">1D optimization, which should be robust against local flatness in the target function, </span>
+<span class="sd">but also estimate errors on the final parameter.</span>
+
+<span class="sd">We know that there is only one minimum, and it is far from the constraints.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="k">def</span> <span class="nf">plot_values</span><span class="p">(</span><span class="n">values</span><span class="p">,</span> <span class="n">points</span><span class="p">,</span> <span class="n">lastpoint</span><span class="p">,</span> <span class="n">ymax</span><span class="o">=</span><span class="n">numpy</span><span class="o">.</span><span class="n">nan</span><span class="p">,</span> <span class="n">ftol</span><span class="o">=</span><span class="mf">0.05</span><span class="p">):</span>
+	<span class="c">#print &#39;values:&#39;, zip(points, values)</span>
+	<span class="c">#print &#39;last value&#39;, points[lastpoint], values[lastpoint]</span>
+	<span class="n">plt</span><span class="o">.</span><span class="n">figure</span><span class="p">()</span>
+	<span class="n">plt</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">points</span><span class="p">,</span> <span class="n">values</span><span class="p">,</span> <span class="s">&#39;o--&#39;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s">&#39;blue&#39;</span><span class="p">)</span>
+	<span class="n">plt</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">points</span><span class="p">[</span><span class="n">lastpoint</span><span class="p">],</span> <span class="n">values</span><span class="p">[</span><span class="n">lastpoint</span><span class="p">],</span> <span class="s">&#39;o&#39;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s">&#39;red&#39;</span><span class="p">)</span>
+	<span class="k">if</span> <span class="n">numpy</span><span class="o">.</span><span class="n">isnan</span><span class="p">(</span><span class="n">ymax</span><span class="p">):</span>
+		<span class="n">worst</span> <span class="o">=</span> <span class="p">[</span><span class="n">v</span> <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">values</span> <span class="k">if</span> <span class="n">v</span> <span class="o">&lt;</span> <span class="mf">1e100</span><span class="p">]</span>
+		<span class="n">ymax</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">worst</span><span class="p">)</span>
+	<span class="n">plt</span><span class="o">.</span><span class="n">ylim</span><span class="p">(</span><span class="nb">min</span><span class="p">(</span><span class="n">values</span><span class="p">)</span><span class="o">-</span><span class="n">ftol</span><span class="p">,</span> <span class="n">ymax</span><span class="o">+</span><span class="n">ftol</span><span class="p">)</span>
+	<span class="n">plt</span><span class="o">.</span><span class="n">savefig</span><span class="p">(</span><span class="s">&#39;optimize1d.pdf&#39;</span><span class="p">)</span>
+	<span class="n">plt</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+
+<span class="n">phi</span> <span class="o">=</span> <span class="p">(</span><span class="mi">1</span> <span class="o">+</span> <span class="mi">5</span><span class="o">**</span><span class="mf">0.5</span><span class="p">)</span> <span class="o">/</span> <span class="mi">2</span>
+<span class="n">resphi</span> <span class="o">=</span> <span class="mi">2</span> <span class="o">-</span> <span class="n">phi</span>
+
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Is this a line within the tolerance --&gt; return False</span>
+<span class="sd">&quot;&quot;&quot;</span>	
+<span class="k">def</span> <span class="nf">has_curvature</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">c</span><span class="p">,</span> <span class="n">va</span><span class="p">,</span> <span class="n">vb</span><span class="p">,</span> <span class="n">vc</span><span class="p">,</span> <span class="n">ftol</span><span class="p">,</span> <span class="n">disp</span><span class="p">):</span>
+	<span class="n">ftol</span> <span class="o">=</span> <span class="mi">10000</span> <span class="o">*</span> <span class="n">ftol</span>
+	<span class="n">grad</span> <span class="o">=</span> <span class="p">(</span><span class="n">vc</span> <span class="o">-</span> <span class="n">va</span><span class="p">)</span> <span class="o">/</span> <span class="p">(</span><span class="n">c</span> <span class="o">-</span> <span class="n">a</span><span class="p">)</span>
+	<span class="n">vbpred</span> <span class="o">=</span> <span class="n">grad</span> <span class="o">*</span> <span class="p">(</span><span class="n">b</span> <span class="o">-</span> <span class="n">a</span><span class="p">)</span> <span class="o">+</span> <span class="n">va</span>
+	<span class="n">curvcrit</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">vbpred</span> <span class="o">-</span> <span class="n">vb</span><span class="p">)</span> <span class="o">&gt;</span> <span class="n">ftol</span>
+	<span class="k">if</span> <span class="n">disp</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span> <span class="k">print</span> <span class="s">&#39;</span><span class="se">\t</span><span class="s">Curvature checking: </span><span class="si">%f</span><span class="s"> (tol=</span><span class="si">%f</span><span class="s">): &#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">vbpred</span> <span class="o">-</span> <span class="n">vb</span><span class="p">,</span> <span class="n">ftol</span><span class="p">),</span> <span class="n">curvcrit</span>
+	<span class="k">return</span> <span class="n">curvcrit</span>
+
+<span class="k">def</span> <span class="nf">escalate_left</span><span class="p">(</span><span class="n">function</span><span class="p">,</span> <span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">va</span><span class="p">,</span> <span class="n">vb</span><span class="p">,</span> <span class="n">cons</span><span class="p">,</span> <span class="n">lstep</span><span class="p">,</span> <span class="n">ftol</span><span class="p">,</span> <span class="n">disp</span><span class="p">,</span> <span class="n">plot</span><span class="p">):</span>
+	<span class="k">assert</span> <span class="n">va</span> <span class="o">&lt;</span> <span class="n">vb</span><span class="p">,</span> <span class="p">(</span><span class="n">va</span><span class="p">,</span> <span class="n">vb</span><span class="p">)</span>
+	<span class="k">while</span> <span class="n">va</span> <span class="o">&lt;</span> <span class="n">vb</span><span class="p">:</span> <span class="c"># we have to go left</span>
+		<span class="k">if</span> <span class="n">disp</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span> <span class="k">print</span> <span class="s">&#39;   &lt;&lt;&lt; fast forwarding to LEFT &lt;&lt;&lt; &#39;</span>
+		<span class="n">b</span><span class="p">,</span> <span class="n">c</span> <span class="o">=</span> <span class="n">a</span><span class="p">,</span> <span class="n">b</span>
+		<span class="n">vb</span><span class="p">,</span> <span class="n">vc</span> <span class="o">=</span> <span class="n">va</span><span class="p">,</span> <span class="n">vb</span>
+		<span class="n">lstep</span> <span class="o">+=</span> <span class="mi">1</span>
+		<span class="k">while</span> <span class="nb">any</span><span class="p">([</span><span class="n">con</span><span class="p">(</span><span class="n">b</span> <span class="o">-</span> <span class="n">lstep</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mi">0</span> <span class="k">for</span> <span class="n">con</span> <span class="ow">in</span> <span class="n">cons</span><span class="p">]):</span>
+			<span class="n">lstep</span> <span class="o">/=</span> <span class="mi">3</span>
+		<span class="n">a</span> <span class="o">=</span> <span class="n">b</span> <span class="o">-</span> <span class="n">lstep</span>
+		<span class="n">va</span> <span class="o">=</span> <span class="n">function</span><span class="p">(</span><span class="n">a</span><span class="p">)</span>
+		<span class="k">if</span> <span class="n">disp</span> <span class="o">&gt;</span> <span class="mi">5</span><span class="p">:</span>
+			<span class="k">if</span> <span class="n">plot</span><span class="p">:</span>
+				<span class="n">plot_values</span><span class="p">([</span><span class="n">va</span><span class="p">,</span> <span class="n">vb</span><span class="p">,</span> <span class="n">vc</span><span class="p">],</span> <span class="p">[</span><span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">c</span><span class="p">],</span> <span class="n">lastpoint</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">ftol</span><span class="o">=</span><span class="n">ftol</span><span class="p">)</span>
+		<span class="k">if</span> <span class="n">disp</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span> <span class="k">print</span> <span class="s">&#39;	left </span><span class="si">%f</span><span class="s"> [</span><span class="si">%f</span><span class="s">]&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">va</span><span class="p">)</span>
+		<span class="k">if</span> <span class="n">va</span> <span class="o">&gt;</span> <span class="n">vb</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">has_curvature</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">c</span><span class="p">,</span> <span class="n">va</span><span class="p">,</span> <span class="n">vb</span><span class="p">,</span> <span class="n">vc</span><span class="p">,</span> <span class="n">ftol</span><span class="p">,</span> <span class="n">disp</span><span class="p">):</span> <span class="c"># finally, we found the border</span>
+			<span class="k">if</span> <span class="n">disp</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span> <span class="k">print</span> <span class="s">&#39; found left border&#39;</span>
+			<span class="k">return</span> <span class="p">[</span><span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">c</span><span class="p">],</span> <span class="p">[</span><span class="n">va</span><span class="p">,</span> <span class="n">vb</span><span class="p">,</span> <span class="n">vc</span><span class="p">]</span>
+	<span class="k">return</span> <span class="p">[</span><span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">c</span><span class="p">],</span> <span class="p">[</span><span class="n">va</span><span class="p">,</span> <span class="n">vb</span><span class="p">,</span> <span class="n">vc</span><span class="p">]</span>
+<span class="k">def</span> <span class="nf">escalate_right</span><span class="p">(</span><span class="n">function</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">c</span><span class="p">,</span> <span class="n">vb</span><span class="p">,</span> <span class="n">vc</span><span class="p">,</span> <span class="n">cons</span><span class="p">,</span> <span class="n">rstep</span><span class="p">,</span> <span class="n">ftol</span><span class="p">,</span> <span class="n">disp</span><span class="p">,</span> <span class="n">plot</span><span class="p">):</span>
+	<span class="k">assert</span> <span class="n">vc</span> <span class="o">&lt;</span> <span class="n">vb</span><span class="p">,</span> <span class="p">(</span><span class="n">vc</span><span class="p">,</span> <span class="n">vb</span><span class="p">)</span>
+	<span class="k">while</span> <span class="n">vc</span> <span class="o">&lt;</span> <span class="n">vb</span><span class="p">:</span> <span class="c"># we have to go right</span>
+		<span class="k">if</span> <span class="n">disp</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span> <span class="k">print</span> <span class="s">&#39;   &gt;&gt;&gt; fast forwarding to RIGHT &gt;&gt;&gt; &#39;</span>
+		<span class="n">a</span><span class="p">,</span> <span class="n">b</span> <span class="o">=</span> <span class="n">b</span><span class="p">,</span> <span class="n">c</span>
+		<span class="n">va</span><span class="p">,</span> <span class="n">vb</span> <span class="o">=</span> <span class="n">vb</span><span class="p">,</span> <span class="n">vc</span>
+		<span class="n">rstep</span> <span class="o">+=</span> <span class="mi">1</span>
+		<span class="k">while</span> <span class="nb">any</span><span class="p">([</span><span class="n">con</span><span class="p">(</span><span class="n">b</span> <span class="o">+</span> <span class="n">rstep</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mi">0</span> <span class="k">for</span> <span class="n">con</span> <span class="ow">in</span> <span class="n">cons</span><span class="p">]):</span>
+			<span class="n">rstep</span> <span class="o">/=</span> <span class="mi">3</span>
+		<span class="n">c</span> <span class="o">=</span> <span class="n">b</span> <span class="o">+</span> <span class="n">rstep</span>
+		<span class="n">vc</span> <span class="o">=</span> <span class="n">function</span><span class="p">(</span><span class="n">c</span><span class="p">)</span>
+		<span class="k">if</span> <span class="n">disp</span> <span class="o">&gt;</span> <span class="mi">5</span><span class="p">:</span>
+			<span class="k">if</span> <span class="n">plot</span><span class="p">:</span>
+				<span class="n">plot_values</span><span class="p">([</span><span class="n">va</span><span class="p">,</span> <span class="n">vb</span><span class="p">,</span> <span class="n">vc</span><span class="p">],</span> <span class="p">[</span><span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">c</span><span class="p">],</span> <span class="n">lastpoint</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">ftol</span><span class="o">=</span><span class="n">ftol</span><span class="p">)</span>
+		<span class="k">if</span> <span class="n">disp</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span> <span class="k">print</span> <span class="s">&#39;	right </span><span class="si">%f</span><span class="s"> [</span><span class="si">%f</span><span class="s">]&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">c</span><span class="p">,</span> <span class="n">vc</span><span class="p">)</span>
+		<span class="k">if</span> <span class="n">vc</span> <span class="o">&gt;</span> <span class="n">vb</span><span class="p">:</span> <span class="c"># finally, we found the border</span>
+			<span class="k">if</span> <span class="n">disp</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span> <span class="k">print</span> <span class="s">&#39; found right border&#39;</span>
+			<span class="k">return</span> <span class="p">[</span><span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">c</span><span class="p">],</span> <span class="p">[</span><span class="n">va</span><span class="p">,</span> <span class="n">vb</span><span class="p">,</span> <span class="n">vc</span><span class="p">]</span>
+	<span class="k">return</span> <span class="p">[</span><span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">c</span><span class="p">],</span> <span class="p">[</span><span class="n">va</span><span class="p">,</span> <span class="n">vb</span><span class="p">,</span> <span class="n">vc</span><span class="p">]</span>
+
+<span class="k">def</span> <span class="nf">seek_minimum_bracket</span><span class="p">(</span><span class="n">function</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">cons</span><span class="p">,</span> <span class="n">ftol</span><span class="p">,</span> <span class="n">disp</span><span class="p">,</span> <span class="n">plot</span><span class="p">):</span>
+	<span class="c"># we want to bracket the minimum first</span>
+	<span class="n">lstep</span> <span class="o">=</span> <span class="mf">0.7</span>
+	<span class="n">rstep</span> <span class="o">=</span> <span class="mf">0.7</span>
+	
+	<span class="k">assert</span> <span class="ow">not</span> <span class="nb">any</span><span class="p">([</span><span class="n">c</span><span class="p">(</span><span class="n">b</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mi">0</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">cons</span><span class="p">]),</span> <span class="p">[</span><span class="n">b</span><span class="p">]</span>
+	<span class="n">vb</span> <span class="o">=</span> <span class="n">function</span><span class="p">(</span><span class="n">b</span><span class="p">)</span>
+	<span class="k">if</span> <span class="n">disp</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span> <span class="k">print</span> <span class="s">&#39;starting at </span><span class="si">%f</span><span class="s"> [</span><span class="si">%f</span><span class="s">]&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">b</span><span class="p">,</span> <span class="n">vb</span><span class="p">)</span>
+	<span class="k">while</span> <span class="nb">any</span><span class="p">([</span><span class="n">c</span><span class="p">(</span><span class="n">b</span> <span class="o">-</span> <span class="n">lstep</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mi">0</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">cons</span><span class="p">]):</span>
+		<span class="n">lstep</span> <span class="o">/=</span> <span class="mi">3</span>
+		<span class="k">if</span> <span class="n">disp</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span> <span class="k">print</span> <span class="s">&#39;reducing lstep for constraint&#39;</span>
+	<span class="n">a</span> <span class="o">=</span> <span class="n">b</span> <span class="o">-</span> <span class="n">lstep</span>
+	<span class="n">va</span> <span class="o">=</span> <span class="n">function</span><span class="p">(</span><span class="n">a</span><span class="p">)</span>
+	<span class="k">if</span> <span class="n">disp</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span> <span class="k">print</span> <span class="s">&#39;left </span><span class="si">%f</span><span class="s"> [</span><span class="si">%f</span><span class="s">]&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">va</span><span class="p">)</span>
+	<span class="c">#plot([va, vb], [a, b], lastpoint=0, ftol=ftol)</span>
+	
+	<span class="k">if</span> <span class="n">va</span> <span class="o">&lt;=</span> <span class="n">vb</span><span class="p">:</span> <span class="c"># we have to go left</span>
+		<span class="k">return</span> <span class="n">escalate_left</span><span class="p">(</span><span class="n">function</span><span class="p">,</span> <span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">va</span><span class="p">,</span> <span class="n">vb</span><span class="p">,</span> <span class="n">cons</span><span class="p">,</span> <span class="n">lstep</span><span class="p">,</span> <span class="n">ftol</span><span class="p">,</span> <span class="n">disp</span><span class="p">,</span> <span class="n">plot</span><span class="p">)</span>
+	
+	<span class="k">while</span> <span class="nb">any</span><span class="p">([</span><span class="n">c</span><span class="p">(</span><span class="n">b</span> <span class="o">+</span> <span class="n">rstep</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mi">0</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">cons</span><span class="p">]):</span>
+		<span class="n">rstep</span> <span class="o">/=</span> <span class="mi">3</span>
+		<span class="k">if</span> <span class="n">disp</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span> <span class="k">print</span> <span class="s">&#39;reducing rstep for constraint&#39;</span>
+	<span class="n">c</span> <span class="o">=</span> <span class="n">b</span> <span class="o">+</span> <span class="n">rstep</span>
+	<span class="n">vc</span> <span class="o">=</span> <span class="n">function</span><span class="p">(</span><span class="n">c</span><span class="p">)</span>
+	<span class="c">#plot([va, vb, vc], [a, b, c], lastpoint=2, ftol=ftol)</span>
+	<span class="k">if</span> <span class="n">disp</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span> <span class="k">print</span> <span class="s">&#39;right </span><span class="si">%f</span><span class="s"> [</span><span class="si">%f</span><span class="s">]&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">c</span><span class="p">,</span> <span class="n">vc</span><span class="p">)</span>
+	
+	<span class="k">if</span> <span class="n">vc</span> <span class="o">&lt;=</span> <span class="n">vb</span><span class="p">:</span> <span class="c"># we have to go right</span>
+		<span class="k">return</span> <span class="n">escalate_right</span><span class="p">(</span><span class="n">function</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">c</span><span class="p">,</span> <span class="n">vb</span><span class="p">,</span> <span class="n">vc</span><span class="p">,</span> <span class="n">cons</span><span class="p">,</span> <span class="n">rstep</span><span class="p">,</span> <span class="n">ftol</span><span class="p">,</span> <span class="n">disp</span><span class="p">,</span> <span class="n">plot</span><span class="p">)</span>
+	<span class="k">return</span> <span class="p">[</span><span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">c</span><span class="p">],</span> <span class="p">[</span><span class="n">va</span><span class="p">,</span> <span class="n">vb</span><span class="p">,</span> <span class="n">vc</span><span class="p">]</span>
+
+<span class="k">def</span> <span class="nf">brent</span><span class="p">(</span><span class="n">function</span><span class="p">,</span> <span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">c</span><span class="p">,</span> <span class="n">va</span><span class="p">,</span> <span class="n">vb</span><span class="p">,</span> <span class="n">vc</span><span class="p">,</span> <span class="n">cons</span><span class="p">,</span> <span class="n">ftol</span><span class="p">,</span> <span class="n">disp</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">plot</span><span class="o">=</span><span class="bp">False</span><span class="p">):</span>
+	<span class="k">while</span> <span class="bp">True</span><span class="p">:</span>
+		<span class="k">if</span> <span class="n">disp</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span> <span class="k">print</span> <span class="s">&#39; BRENT&#39;</span><span class="p">,</span> <span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">c</span><span class="p">,</span> <span class="n">va</span><span class="p">,</span> <span class="n">vb</span><span class="p">,</span> <span class="n">vc</span>
+		<span class="k">if</span> <span class="n">vb</span> <span class="o">&lt;=</span> <span class="n">va</span> <span class="ow">and</span> <span class="n">vb</span> <span class="o">&lt;=</span> <span class="n">vc</span><span class="p">:</span>
+			<span class="k">if</span> <span class="n">numpy</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">vb</span> <span class="o">-</span> <span class="n">va</span><span class="p">)</span> <span class="o">+</span> <span class="n">numpy</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">vb</span> <span class="o">-</span> <span class="n">vc</span><span class="p">)</span> <span class="o">&lt;=</span> <span class="n">ftol</span><span class="p">:</span>
+				<span class="k">if</span> <span class="n">disp</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span> <span class="k">print</span> <span class="s">&#39; ===&gt; found minimum at </span><span class="si">%f</span><span class="s">, </span><span class="si">%f</span><span class="s">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">b</span><span class="p">,</span> <span class="n">vb</span><span class="p">)</span>
+				<span class="k">return</span> <span class="n">b</span>
+		<span class="k">if</span> <span class="n">numpy</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">vb</span> <span class="o">-</span> <span class="n">va</span><span class="p">)</span> <span class="o">+</span> <span class="n">numpy</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">vb</span> <span class="o">-</span> <span class="n">vc</span><span class="p">)</span> <span class="o">&lt;=</span> <span class="n">ftol</span><span class="p">:</span>
+			<span class="k">print</span> <span class="s">&#39;Potentially problematic case. Increasing verbosity!&#39;</span>
+			<span class="k">print</span> <span class="s">&#39;   Narrowing to ftol:&#39;</span><span class="p">,</span> <span class="n">numpy</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">vb</span> <span class="o">-</span> <span class="n">va</span><span class="p">)</span> <span class="o">+</span> <span class="n">numpy</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">vb</span> <span class="o">-</span> <span class="n">vc</span><span class="p">)</span>
+			<span class="n">disp</span> <span class="o">=</span> <span class="mi">4</span>
+		<span class="n">x</span> <span class="o">=</span> <span class="n">b</span> <span class="o">-</span> <span class="mf">0.5</span> <span class="o">*</span> <span class="p">((</span><span class="n">b</span> <span class="o">-</span> <span class="n">a</span><span class="p">)</span><span class="o">**</span><span class="mi">2</span> <span class="o">*</span> <span class="p">(</span><span class="n">vb</span> <span class="o">-</span> <span class="n">vc</span><span class="p">)</span> <span class="o">-</span> <span class="p">(</span><span class="n">b</span> <span class="o">-</span> <span class="n">c</span><span class="p">)</span><span class="o">**</span><span class="mi">2</span><span class="o">*</span><span class="p">(</span><span class="n">vb</span> <span class="o">-</span> <span class="n">va</span><span class="p">))</span> <span class="o">/</span> <span class="p">((</span><span class="n">b</span> <span class="o">-</span> <span class="n">a</span><span class="p">)</span> <span class="o">*</span> <span class="p">(</span><span class="n">vb</span> <span class="o">-</span> <span class="n">vc</span><span class="p">)</span> <span class="o">-</span> <span class="p">(</span><span class="n">b</span> <span class="o">-</span> <span class="n">c</span><span class="p">)</span> <span class="o">*</span> <span class="p">(</span><span class="n">vb</span> <span class="o">-</span> <span class="n">va</span><span class="p">))</span>
+		<span class="k">if</span> <span class="n">disp</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span> <span class="k">print</span> <span class="s">&#39;suggested point:&#39;</span><span class="p">,</span> <span class="n">x</span>
+		<span class="n">safety</span> <span class="o">=</span> <span class="mf">10.</span>
+		<span class="k">if</span> <span class="n">x</span> <span class="o">&lt;</span> <span class="n">b</span> <span class="ow">and</span> <span class="n">x</span> <span class="o">&gt;</span> <span class="n">a</span> <span class="ow">and</span> <span class="n">c</span> <span class="o">-</span> <span class="n">b</span> <span class="o">&gt;=</span> <span class="p">(</span><span class="n">b</span> <span class="o">-</span> <span class="n">a</span><span class="p">)</span> <span class="o">*</span> <span class="n">safety</span><span class="p">:</span>
+			<span class="k">if</span> <span class="n">disp</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span> <span class="k">print</span> <span class="s">&#39;we want to go left, but right side is getting too mighty&#39;</span>
+			<span class="n">x</span> <span class="o">=</span> <span class="p">(</span><span class="n">c</span> <span class="o">+</span> <span class="p">(</span><span class="n">safety</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span> <span class="o">*</span> <span class="n">b</span><span class="p">)</span> <span class="o">/</span> <span class="n">safety</span>
+		<span class="k">if</span> <span class="n">x</span> <span class="o">&lt;</span> <span class="n">c</span> <span class="ow">and</span> <span class="n">x</span> <span class="o">&gt;</span> <span class="n">b</span> <span class="ow">and</span> <span class="n">b</span> <span class="o">-</span> <span class="n">a</span> <span class="o">&gt;=</span> <span class="p">(</span><span class="n">c</span> <span class="o">-</span> <span class="n">b</span><span class="p">)</span> <span class="o">*</span> <span class="n">safety</span><span class="p">:</span>
+			<span class="k">if</span> <span class="n">disp</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span> <span class="k">print</span> <span class="s">&#39;we want to go right, but left side is getting too mighty&#39;</span>
+			<span class="n">x</span> <span class="o">=</span> <span class="p">((</span><span class="n">safety</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span> <span class="o">*</span> <span class="n">b</span> <span class="o">+</span> <span class="n">a</span><span class="p">)</span> <span class="o">/</span> <span class="n">safety</span>
+		
+		<span class="n">safety2</span> <span class="o">=</span> <span class="mf">10.</span>
+		<span class="k">if</span> <span class="n">x</span> <span class="o">&lt;=</span> <span class="n">b</span><span class="p">:</span>
+			<span class="k">if</span> <span class="n">x</span> <span class="o">-</span> <span class="n">a</span> <span class="o">&lt;=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">b</span> <span class="o">-</span> <span class="n">a</span><span class="p">)</span> <span class="o">/</span> <span class="n">safety2</span><span class="p">:</span>
+				<span class="k">if</span> <span class="n">disp</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span> <span class="k">print</span> <span class="s">&#39;we want to go left, but are too close to left side&#39;</span>
+				<span class="n">x</span> <span class="o">=</span> <span class="n">a</span> <span class="o">+</span> <span class="p">(</span><span class="n">b</span> <span class="o">-</span> <span class="n">a</span><span class="p">)</span> <span class="o">/</span> <span class="n">safety2</span>
+			<span class="k">if</span> <span class="n">b</span> <span class="o">-</span> <span class="n">x</span> <span class="o">&lt;=</span> <span class="p">(</span><span class="n">b</span> <span class="o">-</span> <span class="n">a</span><span class="p">)</span> <span class="o">/</span> <span class="n">safety2</span><span class="p">:</span>
+				<span class="k">if</span> <span class="n">disp</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span> <span class="k">print</span> <span class="s">&#39;we want to go left, but are too close to the center&#39;</span>
+				<span class="k">if</span> <span class="p">(</span><span class="n">b</span> <span class="o">-</span> <span class="n">a</span><span class="p">)</span> <span class="o">*</span> <span class="n">numpy</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">va</span> <span class="o">-</span> <span class="n">vb</span><span class="p">)</span> <span class="o">&gt;=</span> <span class="p">(</span><span class="n">c</span> <span class="o">-</span> <span class="n">b</span><span class="p">)</span> <span class="o">*</span> <span class="n">numpy</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">vc</span> <span class="o">-</span> <span class="n">vb</span><span class="p">)</span> <span class="o">*</span> <span class="n">safety</span><span class="o">**</span><span class="mi">2</span><span class="p">:</span>
+					<span class="k">if</span> <span class="n">disp</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span> <span class="k">print</span> <span class="s">&#39;left side is very mighty&#39;</span>
+					<span class="n">x</span> <span class="o">=</span> <span class="p">(</span><span class="n">b</span> <span class="o">+</span> <span class="n">a</span><span class="p">)</span> <span class="o">/</span> <span class="mf">2.</span>
+				<span class="k">else</span><span class="p">:</span>
+					<span class="n">x</span> <span class="o">=</span> <span class="n">b</span> <span class="o">-</span> <span class="p">(</span><span class="n">b</span> <span class="o">-</span> <span class="n">a</span><span class="p">)</span> <span class="o">/</span> <span class="n">safety2</span>
+		<span class="k">if</span> <span class="n">x</span> <span class="o">&gt;=</span> <span class="n">b</span><span class="p">:</span>
+			<span class="k">if</span> <span class="n">c</span> <span class="o">-</span> <span class="n">x</span> <span class="o">&lt;=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">c</span> <span class="o">-</span> <span class="n">b</span><span class="p">)</span> <span class="o">/</span> <span class="n">safety2</span><span class="p">:</span>
+				<span class="k">if</span> <span class="n">disp</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span> <span class="k">print</span> <span class="s">&#39;we want to go right, but are too close to right side&#39;</span>
+				<span class="n">x</span> <span class="o">=</span> <span class="n">c</span> <span class="o">-</span> <span class="p">(</span><span class="n">c</span> <span class="o">-</span> <span class="n">b</span><span class="p">)</span> <span class="o">/</span> <span class="n">safety2</span>
+			<span class="k">if</span> <span class="n">x</span> <span class="o">-</span> <span class="n">b</span> <span class="o">&lt;=</span> <span class="p">(</span><span class="n">c</span> <span class="o">-</span> <span class="n">b</span><span class="p">)</span> <span class="o">/</span> <span class="n">safety2</span><span class="p">:</span>
+				<span class="k">if</span> <span class="n">disp</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span> <span class="k">print</span> <span class="s">&#39;we want to go right, but are too close to the center&#39;</span>
+				<span class="k">if</span> <span class="p">(</span><span class="n">c</span> <span class="o">-</span> <span class="n">b</span><span class="p">)</span> <span class="o">*</span> <span class="n">numpy</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">vc</span> <span class="o">-</span> <span class="n">vb</span><span class="p">)</span> <span class="o">&gt;=</span> <span class="p">(</span><span class="n">b</span> <span class="o">-</span> <span class="n">a</span><span class="p">)</span> <span class="o">*</span> <span class="n">numpy</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">va</span> <span class="o">-</span> <span class="n">vb</span><span class="p">)</span> <span class="o">*</span> <span class="n">safety</span><span class="o">**</span><span class="mi">2</span><span class="p">:</span>
+					<span class="k">if</span> <span class="n">disp</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span> <span class="k">print</span> <span class="s">&#39;right side is very mighty&#39;</span>
+					<span class="n">x</span> <span class="o">=</span> <span class="p">(</span><span class="n">b</span> <span class="o">+</span> <span class="n">c</span><span class="p">)</span> <span class="o">/</span> <span class="mf">2.</span>
+				<span class="k">else</span><span class="p">:</span>
+					<span class="n">x</span> <span class="o">=</span> <span class="n">b</span> <span class="o">+</span> <span class="p">(</span><span class="n">c</span> <span class="o">-</span> <span class="n">b</span><span class="p">)</span> <span class="o">/</span> <span class="n">safety2</span>
+		
+		<span class="k">if</span> <span class="n">va</span> <span class="o">&lt;</span> <span class="n">vb</span><span class="p">:</span> <span class="c"># should go left</span>
+			<span class="k">if</span> <span class="n">x</span> <span class="o">&gt;</span> <span class="n">a</span><span class="p">:</span>
+				<span class="k">if</span> <span class="n">disp</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span> <span class="k">print</span> <span class="s">&#39;I think we should go further left, to bracket the minimum&#39;</span>
+				<span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">c</span><span class="p">),</span> <span class="p">(</span><span class="n">va</span><span class="p">,</span> <span class="n">vb</span><span class="p">,</span> <span class="n">vc</span><span class="p">)</span> <span class="o">=</span> <span class="n">escalate_left</span><span class="p">(</span><span class="n">function</span><span class="p">,</span> <span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">va</span><span class="p">,</span> <span class="n">vb</span><span class="p">,</span> <span class="n">cons</span><span class="o">=</span><span class="n">cons</span><span class="p">,</span> <span class="n">lstep</span><span class="o">=</span><span class="n">c</span> <span class="o">-</span> <span class="n">a</span><span class="p">,</span> <span class="n">ftol</span><span class="o">=</span><span class="n">ftol</span><span class="p">,</span> <span class="n">disp</span><span class="o">=</span><span class="n">disp</span><span class="p">,</span> <span class="n">plot</span><span class="o">=</span><span class="n">plot</span><span class="p">)</span>
+				<span class="k">if</span> <span class="n">numpy</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">vb</span> <span class="o">-</span> <span class="n">va</span><span class="p">)</span> <span class="o">+</span> <span class="n">numpy</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">vb</span> <span class="o">-</span> <span class="n">vc</span><span class="p">)</span> <span class="o">&lt;=</span> <span class="n">ftol</span><span class="p">:</span>
+					<span class="k">if</span> <span class="n">disp</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span> <span class="k">print</span> <span class="s">&#39; ===&gt; found minimum at left border </span><span class="si">%f</span><span class="s">, </span><span class="si">%f</span><span class="s">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">b</span><span class="p">,</span> <span class="n">vb</span><span class="p">)</span>
+					<span class="k">return</span> <span class="n">b</span>
+				<span class="c">#disp = 4</span>
+				<span class="k">continue</span>
+				<span class="n">x</span> <span class="o">=</span> <span class="n">a</span> <span class="o">-</span> <span class="p">(</span><span class="n">c</span> <span class="o">-</span> <span class="n">b</span><span class="p">)</span>
+				
+		<span class="k">if</span> <span class="n">vc</span> <span class="o">&lt;</span> <span class="n">vb</span><span class="p">:</span> <span class="c"># should go right</span>
+			<span class="k">if</span> <span class="n">x</span> <span class="o">&lt;</span> <span class="n">c</span><span class="p">:</span>
+				<span class="k">if</span> <span class="n">disp</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span> <span class="k">print</span> <span class="s">&#39;I think we should go further right, to bracket the minimum&#39;</span>
+				<span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">c</span><span class="p">),</span> <span class="p">(</span><span class="n">va</span><span class="p">,</span> <span class="n">vb</span><span class="p">,</span> <span class="n">vc</span><span class="p">)</span> <span class="o">=</span> <span class="n">escalate_right</span><span class="p">(</span><span class="n">function</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">c</span><span class="p">,</span> <span class="n">vb</span><span class="p">,</span> <span class="n">vc</span><span class="p">,</span> <span class="n">cons</span><span class="o">=</span><span class="n">cons</span><span class="p">,</span> <span class="n">rstep</span><span class="o">=</span><span class="n">c</span> <span class="o">-</span> <span class="n">a</span><span class="p">,</span> <span class="n">ftol</span><span class="o">=</span><span class="n">ftol</span><span class="p">,</span> <span class="n">disp</span><span class="o">=</span><span class="n">disp</span><span class="p">,</span> <span class="n">plot</span><span class="o">=</span><span class="n">plot</span><span class="p">)</span>
+				<span class="k">if</span> <span class="n">numpy</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">vb</span> <span class="o">-</span> <span class="n">va</span><span class="p">)</span> <span class="o">+</span> <span class="n">numpy</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">vb</span> <span class="o">-</span> <span class="n">vc</span><span class="p">)</span> <span class="o">&lt;=</span> <span class="n">ftol</span><span class="p">:</span>
+					<span class="k">if</span> <span class="n">disp</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span> <span class="k">print</span> <span class="s">&#39; ===&gt; found minimum at right border </span><span class="si">%f</span><span class="s">, </span><span class="si">%f</span><span class="s">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">b</span><span class="p">,</span> <span class="n">vb</span><span class="p">)</span>
+					<span class="k">return</span> <span class="n">b</span>
+				<span class="c">#disp = 4</span>
+				<span class="k">continue</span>
+				<span class="n">x</span> <span class="o">=</span> <span class="n">c</span> <span class="o">+</span> <span class="p">(</span><span class="n">b</span> <span class="o">-</span> <span class="n">a</span><span class="p">)</span>
+		
+			
+		<span class="k">if</span> <span class="n">disp</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span> <span class="k">print</span> <span class="s">&#39;next     point:&#39;</span><span class="p">,</span> <span class="n">x</span>
+		<span class="n">v</span> <span class="o">=</span> <span class="n">function</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+		<span class="k">if</span> <span class="n">disp</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span> <span class="k">print</span> <span class="s">&#39;next     value:&#39;</span><span class="p">,</span> <span class="n">v</span>
+		<span class="k">if</span> <span class="n">disp</span> <span class="o">&gt;</span> <span class="mi">3</span><span class="p">:</span>
+			<span class="k">if</span> <span class="n">plot</span><span class="p">:</span>
+				<span class="n">plot_values</span><span class="p">([</span><span class="n">va</span><span class="p">,</span> <span class="n">vb</span><span class="p">,</span> <span class="n">vc</span><span class="p">,</span> <span class="n">v</span><span class="p">],</span> <span class="p">[</span><span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">c</span><span class="p">,</span> <span class="n">x</span><span class="p">],</span> <span class="n">lastpoint</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">ftol</span><span class="o">=</span><span class="n">ftol</span><span class="p">)</span>
+			<span class="n">pause</span><span class="p">()</span>
+	
+		<span class="k">if</span> <span class="n">disp</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span> <span class="k">print</span> <span class="s">&#39;  deciding on next bracket&#39;</span>
+		<span class="k">if</span> <span class="n">v</span> <span class="o">&lt;</span> <span class="nb">min</span><span class="p">(</span><span class="n">va</span><span class="p">,</span> <span class="n">vb</span><span class="p">,</span> <span class="n">vc</span><span class="p">):</span>
+			<span class="c"># improvement was made.</span>
+			<span class="k">if</span> <span class="n">x</span> <span class="o">&lt;</span> <span class="n">a</span><span class="p">:</span> <span class="c"># go to very left</span>
+				<span class="k">if</span> <span class="n">disp</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span> <span class="k">print</span> <span class="s">&#39;  &lt;&lt;&lt;&lt; &#39;</span>
+				<span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">c</span><span class="p">,</span> <span class="n">va</span><span class="p">,</span> <span class="n">vb</span><span class="p">,</span> <span class="n">vc</span> <span class="o">=</span> <span class="n">x</span><span class="p">,</span> <span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">v</span><span class="p">,</span> <span class="n">va</span><span class="p">,</span> <span class="n">vb</span>
+				<span class="k">continue</span>
+			<span class="k">elif</span> <span class="n">x</span> <span class="o">&lt;</span> <span class="n">b</span><span class="p">:</span> <span class="c"># go to left</span>
+				<span class="k">if</span> <span class="n">disp</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span> <span class="k">print</span> <span class="s">&#39;  &lt;&lt; &#39;</span>
+				<span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">c</span><span class="p">,</span> <span class="n">va</span><span class="p">,</span> <span class="n">vb</span><span class="p">,</span> <span class="n">vc</span> <span class="o">=</span> <span class="n">a</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">va</span><span class="p">,</span> <span class="n">v</span><span class="p">,</span> <span class="n">vb</span>
+				<span class="k">continue</span>
+			<span class="k">elif</span> <span class="n">x</span> <span class="o">&gt;</span> <span class="n">c</span><span class="p">:</span> <span class="c"># go to very right</span>
+				<span class="k">if</span> <span class="n">disp</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span> <span class="k">print</span> <span class="s">&#39;  &gt;&gt;&gt;&gt; &#39;</span>
+				<span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">c</span><span class="p">,</span> <span class="n">va</span><span class="p">,</span> <span class="n">vb</span><span class="p">,</span> <span class="n">vc</span> <span class="o">=</span> <span class="n">b</span><span class="p">,</span> <span class="n">c</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">vb</span><span class="p">,</span> <span class="n">vc</span><span class="p">,</span> <span class="n">v</span>
+				<span class="k">continue</span>
+			<span class="k">else</span><span class="p">:</span> <span class="c"># go to right</span>
+				<span class="k">if</span> <span class="n">disp</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span> <span class="k">print</span> <span class="s">&#39;  &gt;&gt; &#39;</span>
+				<span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">c</span><span class="p">,</span> <span class="n">va</span><span class="p">,</span> <span class="n">vb</span><span class="p">,</span> <span class="n">vc</span> <span class="o">=</span> <span class="n">b</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">c</span><span class="p">,</span> <span class="n">vb</span><span class="p">,</span> <span class="n">v</span><span class="p">,</span> <span class="n">vc</span>
+				<span class="k">continue</span>
+		<span class="c"># no improvement</span>
+		<span class="k">if</span> <span class="n">disp</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span> <span class="k">print</span> <span class="s">&#39; no improvement made&#39;</span>
+		<span class="c"># did we try to move to the outer edges? </span>
+		<span class="k">if</span> <span class="n">va</span> <span class="o">&lt;</span> <span class="n">vb</span> <span class="ow">and</span> <span class="n">x</span> <span class="o">&lt;</span> <span class="n">a</span><span class="p">:</span>
+			<span class="c"># we tried to go very left, but hit the wall</span>
+			<span class="k">if</span> <span class="n">disp</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span> <span class="k">print</span> <span class="s">&#39;  |&lt;&lt; &#39;</span>
+			<span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">c</span><span class="p">,</span> <span class="n">va</span><span class="p">,</span> <span class="n">vb</span><span class="p">,</span> <span class="n">vc</span> <span class="o">=</span> <span class="n">x</span><span class="p">,</span> <span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">v</span><span class="p">,</span> <span class="n">va</span><span class="p">,</span> <span class="n">vb</span>
+			<span class="k">continue</span>
+		<span class="k">elif</span> <span class="n">vc</span> <span class="o">&lt;</span> <span class="n">vb</span> <span class="ow">and</span> <span class="n">x</span> <span class="o">&gt;</span> <span class="n">c</span><span class="p">:</span>
+			<span class="c"># we tried to go very right, but hit the wall</span>
+			<span class="k">if</span> <span class="n">disp</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span> <span class="k">print</span> <span class="s">&#39;  &gt;&gt;| &#39;</span>
+			<span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">c</span><span class="p">,</span> <span class="n">va</span><span class="p">,</span> <span class="n">vb</span><span class="p">,</span> <span class="n">vc</span> <span class="o">=</span> <span class="n">b</span><span class="p">,</span> <span class="n">c</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">vb</span><span class="p">,</span> <span class="n">vc</span><span class="p">,</span> <span class="n">v</span>
+			<span class="k">continue</span>
+		
+		<span class="k">if</span> <span class="n">disp</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span> <span class="k">print</span> <span class="s">&#39; subdividing side&#39;</span>
+		<span class="c"># go to the other side</span>
+		<span class="k">if</span> <span class="ow">not</span> <span class="p">(</span><span class="n">v</span> <span class="o">&lt;</span> <span class="n">va</span> <span class="ow">or</span> <span class="n">v</span> <span class="o">&lt;</span> <span class="n">vc</span><span class="p">):</span>
+			<span class="k">if</span> <span class="n">plot</span><span class="p">:</span>
+				<span class="n">plot_values</span><span class="p">([</span><span class="n">va</span><span class="p">,</span> <span class="n">vb</span><span class="p">,</span> <span class="n">vc</span><span class="p">,</span> <span class="n">v</span><span class="p">],</span> <span class="p">[</span><span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">c</span><span class="p">,</span> <span class="n">x</span><span class="p">],</span> <span class="n">lastpoint</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">ftol</span><span class="o">=</span><span class="n">ftol</span><span class="p">)</span>
+			<span class="k">if</span> <span class="n">disp</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span> <span class="k">print</span> <span class="s">&#39;warning: found flat bit!&#39;</span>
+			<span class="k">return</span> <span class="n">b</span>
+			<span class="k">assert</span> <span class="bp">False</span><span class="p">,</span> <span class="p">[</span><span class="n">v</span> <span class="o">&lt;</span> <span class="n">va</span><span class="p">,</span> <span class="n">v</span><span class="p">,</span> <span class="n">va</span><span class="p">,</span> <span class="n">v</span> <span class="o">&lt;</span> <span class="n">vc</span><span class="p">,</span> <span class="n">v</span><span class="p">,</span> <span class="n">vc</span><span class="p">]</span>
+				
+		<span class="k">if</span> <span class="n">x</span> <span class="o">&lt;</span> <span class="n">b</span><span class="p">:</span> <span class="c"># on the left, go to right side</span>
+			<span class="k">if</span> <span class="n">v</span> <span class="o">&gt;</span> <span class="n">va</span> <span class="ow">and</span> <span class="n">v</span> <span class="o">&lt;</span> <span class="n">vb</span><span class="p">:</span>
+				<span class="k">if</span> <span class="n">disp</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span> <span class="k">print</span> <span class="s">&#39;  . | x | sequence, going left&#39;</span>
+				<span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">c</span><span class="p">,</span> <span class="n">va</span><span class="p">,</span> <span class="n">vb</span><span class="p">,</span> <span class="n">vc</span> <span class="o">=</span> <span class="n">a</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">va</span><span class="p">,</span> <span class="n">v</span><span class="p">,</span> <span class="n">vb</span>
+			<span class="k">elif</span> <span class="n">v</span> <span class="o">&gt;</span> <span class="n">va</span><span class="p">:</span>
+				<span class="k">if</span> <span class="n">plot</span><span class="p">:</span>
+					<span class="n">plot_values</span><span class="p">([</span><span class="n">va</span><span class="p">,</span> <span class="n">vb</span><span class="p">,</span> <span class="n">vc</span><span class="p">,</span> <span class="n">v</span><span class="p">],</span> <span class="p">[</span><span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">c</span><span class="p">,</span> <span class="n">x</span><span class="p">],</span> <span class="n">lastpoint</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">ftol</span><span class="o">=</span><span class="n">ftol</span><span class="p">)</span>
+				<span class="n">disp</span> <span class="o">=</span> <span class="mi">4</span>
+				<span class="k">if</span> <span class="n">disp</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span> <span class="k">print</span> <span class="s">&#39;warning: found flat bit on the right!&#39;</span>
+				<span class="k">return</span> <span class="n">b</span>
+			<span class="k">else</span><span class="p">:</span>
+				<span class="k">if</span> <span class="n">disp</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span> <span class="k">print</span> <span class="s">&#39;  . | x | going right&#39;</span>
+				<span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">c</span><span class="p">,</span> <span class="n">va</span><span class="p">,</span> <span class="n">vb</span><span class="p">,</span> <span class="n">vc</span> <span class="o">=</span> <span class="n">x</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">c</span><span class="p">,</span> <span class="n">v</span><span class="p">,</span> <span class="n">vb</span><span class="p">,</span> <span class="n">vc</span>
+			<span class="k">continue</span>
+		<span class="k">else</span><span class="p">:</span> <span class="c"># on the right, go to left side</span>
+			<span class="k">if</span> <span class="n">v</span> <span class="o">&gt;</span> <span class="n">vc</span> <span class="ow">and</span> <span class="n">v</span> <span class="o">&lt;</span> <span class="n">vb</span><span class="p">:</span>
+				<span class="k">if</span> <span class="n">disp</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span> <span class="k">print</span> <span class="s">&#39;  . | x | sequence, going right&#39;</span>
+				<span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">c</span><span class="p">,</span> <span class="n">va</span><span class="p">,</span> <span class="n">vb</span><span class="p">,</span> <span class="n">vc</span> <span class="o">=</span> <span class="n">b</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">c</span><span class="p">,</span> <span class="n">vb</span><span class="p">,</span> <span class="n">v</span><span class="p">,</span> <span class="n">vc</span>
+			<span class="k">elif</span> <span class="n">v</span> <span class="o">&gt;</span> <span class="n">vc</span><span class="p">:</span>
+				<span class="k">if</span> <span class="n">plot</span><span class="p">:</span>
+					<span class="n">plot_values</span><span class="p">([</span><span class="n">va</span><span class="p">,</span> <span class="n">vb</span><span class="p">,</span> <span class="n">vc</span><span class="p">,</span> <span class="n">v</span><span class="p">],</span> <span class="p">[</span><span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">c</span><span class="p">,</span> <span class="n">x</span><span class="p">],</span> <span class="n">lastpoint</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">ftol</span><span class="o">=</span><span class="n">ftol</span><span class="p">)</span>
+				<span class="n">disp</span> <span class="o">=</span> <span class="mi">4</span>
+				<span class="k">if</span> <span class="n">disp</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span> <span class="k">print</span> <span class="s">&#39;warning: found flat bit on the left!&#39;</span>
+				<span class="k">return</span> <span class="n">b</span>
+			<span class="k">else</span><span class="p">:</span>
+				<span class="k">if</span> <span class="n">disp</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span> <span class="k">print</span> <span class="s">&#39;  | x | . going left&#39;</span>
+				<span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">c</span><span class="p">,</span> <span class="n">va</span><span class="p">,</span> <span class="n">vb</span><span class="p">,</span> <span class="n">vc</span> <span class="o">=</span> <span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">va</span><span class="p">,</span> <span class="n">vb</span><span class="p">,</span> <span class="n">v</span>
+			<span class="k">continue</span>
+		<span class="k">assert</span> <span class="bp">False</span><span class="p">,</span> <span class="p">[</span><span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">c</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">va</span><span class="p">,</span> <span class="n">vb</span><span class="p">,</span> <span class="n">vc</span><span class="p">,</span> <span class="n">v</span><span class="p">]</span>
+
+<span class="n">neval</span> <span class="o">=</span> <span class="mi">0</span>
+
+<span class="k">def</span> <span class="nf">optimize</span><span class="p">(</span><span class="n">function</span><span class="p">,</span> <span class="n">x0</span><span class="p">,</span> <span class="n">cons</span><span class="o">=</span><span class="p">[],</span> <span class="n">ftol</span><span class="o">=</span><span class="mf">0.2</span><span class="p">,</span> <span class="n">disp</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">plot</span><span class="o">=</span><span class="bp">False</span><span class="p">):</span>
+<div class="viewcode-block" id="optimize"><a class="viewcode-back" href="../../doc.html#jbopt.optimize1d.optimize">[docs]</a>	<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">	*Optimization method based on Brent&#39;s method*</span>
+<span class="sd">	</span>
+<span class="sd">	First, a bracket (a b c) is sought that contains the minimum (b value is </span>
+<span class="sd">	smaller than both a or c).</span>
+<span class="sd">	</span>
+<span class="sd">	The bracket is then recursively halfed. Here we apply some modifications</span>
+<span class="sd">	to ensure our suggested point is not too close to either a or c,</span>
+<span class="sd">	because that could be problematic with the local approximation.</span>
+<span class="sd">	Also, if the bracket does not seem to include the minimum,</span>
+<span class="sd">	it is expanded generously in the right direction until it covers it.</span>
+<span class="sd">	</span>
+<span class="sd">	Thus, this function is fail safe, and will always find a local minimum.</span>
+<span class="sd">	&quot;&quot;&quot;</span>
+	<span class="k">if</span> <span class="n">disp</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+		<span class="k">print</span>
+		<span class="k">print</span> <span class="s">&#39;  ===== custom 1d optimization routine ==== &#39;</span>
+		<span class="k">print</span>
+		<span class="k">print</span> <span class="s">&#39;initial suggestion on&#39;</span><span class="p">,</span> <span class="n">function</span><span class="p">,</span> <span class="s">&#39;:&#39;</span><span class="p">,</span> <span class="n">x0</span>
+	<span class="n">points</span> <span class="o">=</span> <span class="p">[]</span>
+	<span class="n">values</span> <span class="o">=</span> <span class="p">[]</span>
+	<span class="k">def</span> <span class="nf">recordfunction</span><span class="p">(</span><span class="n">x</span><span class="p">):</span>
+		<span class="n">v</span> <span class="o">=</span> <span class="n">function</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+		<span class="n">points</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+		<span class="n">values</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">v</span><span class="p">)</span>
+		<span class="k">return</span> <span class="n">v</span>
+	<span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">c</span><span class="p">),</span> <span class="p">(</span><span class="n">va</span><span class="p">,</span> <span class="n">vb</span><span class="p">,</span> <span class="n">vc</span><span class="p">)</span> <span class="o">=</span> <span class="n">seek_minimum_bracket</span><span class="p">(</span><span class="n">recordfunction</span><span class="p">,</span> <span class="n">x0</span><span class="p">,</span> <span class="n">cons</span><span class="o">=</span><span class="n">cons</span><span class="p">,</span> <span class="n">ftol</span><span class="o">=</span><span class="n">ftol</span><span class="p">,</span> <span class="n">disp</span><span class="o">=</span><span class="n">disp</span><span class="p">,</span> <span class="n">plot</span><span class="o">=</span><span class="n">plot</span><span class="p">)</span>
+	<span class="k">if</span> <span class="n">disp</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+		<span class="k">print</span> <span class="s">&#39;---------------------------------------------------&#39;</span>
+		<span class="k">print</span> <span class="s">&#39;found useable minimum bracker after </span><span class="si">%d</span><span class="s"> evaluations:&#39;</span> <span class="o">%</span> <span class="nb">len</span><span class="p">(</span><span class="n">points</span><span class="p">),</span> <span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">c</span><span class="p">),</span> <span class="p">(</span><span class="n">va</span><span class="p">,</span> <span class="n">vb</span><span class="p">,</span> <span class="n">vc</span><span class="p">)</span>
+	<span class="k">if</span> <span class="n">disp</span> <span class="o">&gt;</span> <span class="mi">2</span><span class="p">:</span>
+		<span class="k">if</span> <span class="n">plot</span><span class="p">:</span>
+			<span class="n">plot_values</span><span class="p">(</span><span class="n">values</span><span class="p">,</span> <span class="n">points</span><span class="p">,</span> <span class="n">lastpoint</span><span class="o">=-</span><span class="mi">1</span><span class="p">,</span> <span class="n">ftol</span><span class="o">=</span><span class="n">ftol</span><span class="p">)</span>
+		<span class="n">pause</span><span class="p">()</span>
+	
+	<span class="n">result</span> <span class="o">=</span> <span class="n">brent</span><span class="p">(</span><span class="n">recordfunction</span><span class="p">,</span> <span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">c</span><span class="p">,</span> <span class="n">va</span><span class="p">,</span> <span class="n">vb</span><span class="p">,</span> <span class="n">vc</span><span class="p">,</span> <span class="n">cons</span><span class="o">=</span><span class="n">cons</span><span class="p">,</span> <span class="n">ftol</span><span class="o">=</span><span class="n">ftol</span><span class="p">,</span> <span class="n">disp</span><span class="o">=</span><span class="n">disp</span><span class="p">,</span> <span class="n">plot</span><span class="o">=</span><span class="n">plot</span><span class="p">)</span>
+	<span class="k">if</span> <span class="n">disp</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+		<span class="k">print</span> <span class="s">&#39;---------------------------------------------------&#39;</span>
+		<span class="k">print</span> <span class="s">&#39;found minimum after </span><span class="si">%d</span><span class="s"> evaluations:&#39;</span> <span class="o">%</span> <span class="nb">len</span><span class="p">(</span><span class="n">points</span><span class="p">),</span> <span class="n">result</span>
+	<span class="k">if</span> <span class="n">disp</span> <span class="o">&gt;</span> <span class="mi">1</span> <span class="ow">or</span> <span class="nb">len</span><span class="p">(</span><span class="n">points</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">20</span><span class="p">:</span>
+		<span class="k">if</span> <span class="n">plot</span><span class="p">:</span>
+			<span class="n">plot_values</span><span class="p">(</span><span class="n">values</span><span class="p">,</span> <span class="n">points</span><span class="p">,</span> <span class="n">lastpoint</span><span class="o">=-</span><span class="mi">1</span><span class="p">,</span> <span class="n">ftol</span><span class="o">=</span><span class="n">ftol</span><span class="p">)</span>
+		<span class="k">if</span> <span class="n">disp</span> <span class="o">&gt;</span> <span class="mi">2</span><span class="p">:</span>
+			<span class="n">pause</span><span class="p">()</span>
+	<span class="k">if</span> <span class="n">disp</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+		<span class="k">print</span> <span class="s">&#39;---------------------------------------------------&#39;</span>
+		<span class="k">print</span>
+		<span class="k">print</span> <span class="s">&#39;  ===== end of custom 1d optimization routine ==== &#39;</span>
+		<span class="k">print</span>
+	<span class="k">global</span> <span class="n">neval</span>
+	<span class="n">neval</span> <span class="o">+=</span> <span class="nb">len</span><span class="p">(</span><span class="n">points</span><span class="p">)</span>
+	<span class="k">return</span> <span class="n">result</span>
+
+<span class="k">def</span> <span class="nf">cache2errors</span><span class="p">(</span><span class="n">function</span><span class="p">,</span> <span class="n">cache</span><span class="p">,</span> <span class="n">disp</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">ftol</span><span class="o">=</span><span class="mf">0.05</span><span class="p">):</span></div>
+<div class="viewcode-block" id="cache2errors"><a class="viewcode-back" href="../../doc.html#jbopt.optimize1d.cache2errors">[docs]</a>	<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">	This function will attempt to identify 1 sigma errors, assuming your</span>
+<span class="sd">	function is a chi^2. For this, the 1-sigma is bracketed.</span>
+<span class="sd">	</span>
+<span class="sd">	If you were smart enough to build a cache list of [x,y] into your function,</span>
+<span class="sd">	you can pass it here. The values bracketing 1 sigma will be used as </span>
+<span class="sd">	starting values.</span>
+<span class="sd">	If no such values exist, e.g. because all values were very close to the </span>
+<span class="sd">	optimum (good starting values), the bracket is expanded.</span>
+<span class="sd">	&quot;&quot;&quot;</span>
+	
+	<span class="n">vals</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="nb">sorted</span><span class="p">(</span><span class="n">cache</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">x</span><span class="p">[</span><span class="mi">0</span><span class="p">]))</span>
+	<span class="k">if</span> <span class="n">disp</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span> <span class="k">print</span> <span class="s">&#39; --- cache2errors --- &#39;</span><span class="p">,</span> <span class="n">vals</span>
+	<span class="n">vi</span> <span class="o">=</span> <span class="n">vals</span><span class="p">[:,</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">min</span><span class="p">()</span>
+	<span class="k">def</span> <span class="nf">renormedfunc</span><span class="p">(</span><span class="n">x</span><span class="p">):</span>
+		<span class="n">y</span> <span class="o">=</span> <span class="n">function</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+		<span class="n">cache</span><span class="o">.</span><span class="n">append</span><span class="p">([</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">])</span>
+		<span class="k">if</span> <span class="n">disp</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span> <span class="k">print</span> <span class="s">&#39;    renormed:&#39;</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">y</span> <span class="o">-</span> <span class="p">(</span><span class="n">vi</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span>
+		<span class="k">return</span> <span class="n">y</span> <span class="o">-</span> <span class="p">(</span><span class="n">vi</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span>
+	<span class="n">vals</span><span class="p">[:,</span><span class="mi">1</span><span class="p">]</span> <span class="o">-=</span> <span class="n">vi</span> <span class="o">+</span> <span class="mi">1</span>
+	<span class="n">lowmask</span> <span class="o">=</span> <span class="n">vals</span><span class="p">[:,</span><span class="mi">1</span><span class="p">]</span> <span class="o">&lt;</span> <span class="mi">0</span>
+	<span class="n">highmask</span> <span class="o">=</span> <span class="n">vals</span><span class="p">[:,</span><span class="mi">1</span><span class="p">]</span> <span class="o">&gt;</span> <span class="mi">0</span>
+	<span class="n">indices</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">vals</span><span class="p">))</span>
+	<span class="n">b</span><span class="p">,</span> <span class="n">vb</span> <span class="o">=</span> <span class="n">vals</span><span class="p">[</span><span class="n">indices</span><span class="p">[</span><span class="n">lowmask</span><span class="p">][</span> <span class="mi">0</span><span class="p">],:]</span>
+	<span class="n">c</span><span class="p">,</span> <span class="n">vc</span> <span class="o">=</span> <span class="n">vals</span><span class="p">[</span><span class="n">indices</span><span class="p">[</span><span class="n">lowmask</span><span class="p">][</span><span class="o">-</span><span class="mi">1</span><span class="p">],:]</span>
+	<span class="k">if</span> <span class="nb">any</span><span class="p">(</span><span class="n">vals</span><span class="p">[:,</span><span class="mi">0</span><span class="p">][</span><span class="n">highmask</span><span class="p">]</span> <span class="o">&lt;</span> <span class="n">b</span><span class="p">):</span>
+		<span class="k">if</span> <span class="n">disp</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span> <span class="k">print</span> <span class="s">&#39;already have bracket&#39;</span>
+		<span class="n">a</span><span class="p">,</span> <span class="n">va</span> <span class="o">=</span> <span class="n">vals</span><span class="p">[</span><span class="n">indices</span><span class="p">[</span><span class="n">highmask</span><span class="p">][</span><span class="n">vals</span><span class="p">[:,</span><span class="mi">0</span><span class="p">][</span><span class="n">highmask</span><span class="p">]</span> <span class="o">&lt;</span> <span class="n">b</span><span class="p">][</span><span class="o">-</span><span class="mi">1</span><span class="p">],:]</span>
+	<span class="k">else</span><span class="p">:</span>
+		<span class="n">a</span> <span class="o">=</span> <span class="n">b</span>
+		<span class="n">va</span> <span class="o">=</span> <span class="n">vb</span>
+		<span class="k">while</span> <span class="n">b</span> <span class="o">&gt;</span> <span class="o">-</span><span class="mi">50</span><span class="p">:</span>
+			<span class="n">a</span> <span class="o">=</span> <span class="n">b</span> <span class="o">-</span> <span class="nb">max</span><span class="p">(</span><span class="n">vals</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span><span class="mi">0</span><span class="p">]</span> <span class="o">-</span> <span class="n">vals</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span><span class="mi">0</span><span class="p">],</span> <span class="mi">1</span><span class="p">)</span>
+			<span class="n">va</span> <span class="o">=</span> <span class="n">renormedfunc</span><span class="p">(</span><span class="n">a</span><span class="p">)</span>
+			<span class="k">if</span> <span class="n">disp</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span> <span class="k">print</span> <span class="s">&#39;going further left: </span><span class="si">%.1f</span><span class="s"> [</span><span class="si">%.1f</span><span class="s">] --&gt; </span><span class="si">%.1f</span><span class="s"> [</span><span class="si">%.1f</span><span class="s">]&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">b</span><span class="p">,</span> <span class="n">vb</span><span class="p">,</span> <span class="n">a</span><span class="p">,</span> <span class="n">va</span><span class="p">)</span>
+			<span class="k">if</span> <span class="n">va</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+				<span class="k">if</span> <span class="n">disp</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span> <span class="k">print</span> <span class="s">&#39;found outer part&#39;</span>
+				<span class="k">break</span>
+			<span class="k">else</span><span class="p">:</span>
+				<span class="c"># need to go further</span>
+				<span class="n">b</span> <span class="o">=</span> <span class="n">a</span>
+				<span class="n">vb</span> <span class="o">=</span> <span class="n">va</span>
+	
+	<span class="k">if</span> <span class="n">disp</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span> <span class="k">print</span> <span class="s">&#39;left  bracket&#39;</span><span class="p">,</span> <span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">va</span><span class="p">,</span> <span class="n">vb</span>
+	<span class="k">if</span> <span class="n">va</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="ow">and</span> <span class="n">vb</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">:</span>
+		<span class="n">leftroot</span> <span class="o">=</span> <span class="n">scipy</span><span class="o">.</span><span class="n">optimize</span><span class="o">.</span><span class="n">brentq</span><span class="p">(</span><span class="n">renormedfunc</span><span class="p">,</span> <span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">rtol</span><span class="o">=</span><span class="n">ftol</span><span class="p">)</span>
+	<span class="k">else</span><span class="p">:</span>
+		<span class="k">if</span> <span class="n">disp</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span> <span class="k">print</span> <span class="s">&#39;WARNING: border problem found.&#39;</span>
+		<span class="n">leftroot</span> <span class="o">=</span> <span class="n">a</span>
+	<span class="k">if</span> <span class="n">disp</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span> <span class="k">print</span> <span class="s">&#39;left  root&#39;</span><span class="p">,</span> <span class="n">leftroot</span>
+	
+	<span class="k">if</span> <span class="nb">any</span><span class="p">(</span><span class="n">vals</span><span class="p">[:,</span><span class="mi">0</span><span class="p">][</span><span class="n">highmask</span><span class="p">]</span> <span class="o">&gt;</span> <span class="n">c</span><span class="p">):</span>
+		<span class="k">if</span> <span class="n">disp</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span> <span class="k">print</span> <span class="s">&#39;already have bracket&#39;</span>
+		<span class="n">d</span><span class="p">,</span> <span class="n">vd</span> <span class="o">=</span> <span class="n">vals</span><span class="p">[</span><span class="n">indices</span><span class="p">[</span><span class="n">highmask</span><span class="p">][</span><span class="n">vals</span><span class="p">[:,</span><span class="mi">0</span><span class="p">][</span><span class="n">highmask</span><span class="p">]</span> <span class="o">&gt;</span> <span class="n">c</span><span class="p">][</span> <span class="mi">0</span><span class="p">],:]</span>
+	<span class="k">else</span><span class="p">:</span>
+		<span class="n">d</span> <span class="o">=</span> <span class="n">c</span>
+		<span class="n">vd</span> <span class="o">=</span> <span class="n">vc</span>
+		<span class="k">while</span> <span class="n">c</span> <span class="o">&lt;</span> <span class="mi">50</span><span class="p">:</span>
+			<span class="n">d</span> <span class="o">=</span> <span class="n">c</span> <span class="o">+</span> <span class="nb">max</span><span class="p">(</span><span class="n">vals</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span><span class="mi">0</span><span class="p">]</span> <span class="o">-</span> <span class="n">vals</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span><span class="mi">0</span><span class="p">],</span> <span class="mi">1</span><span class="p">)</span>
+			<span class="n">vd</span> <span class="o">=</span> <span class="n">renormedfunc</span><span class="p">(</span><span class="n">d</span><span class="p">)</span>
+			<span class="k">if</span> <span class="n">disp</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span> <span class="k">print</span> <span class="s">&#39;going further right: </span><span class="si">%.1f</span><span class="s"> [</span><span class="si">%.1f</span><span class="s">] --&gt; </span><span class="si">%.1f</span><span class="s"> [</span><span class="si">%.1f</span><span class="s">]&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">c</span><span class="p">,</span> <span class="n">vc</span><span class="p">,</span> <span class="n">d</span><span class="p">,</span> <span class="n">vd</span><span class="p">)</span>
+			<span class="k">if</span> <span class="n">vd</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+				<span class="k">if</span> <span class="n">disp</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span> <span class="k">print</span> <span class="s">&#39;found outer part&#39;</span>
+				<span class="k">break</span>
+			<span class="k">else</span><span class="p">:</span>
+				<span class="c"># need to go further</span>
+				<span class="n">c</span> <span class="o">=</span> <span class="n">d</span>
+				<span class="n">vc</span> <span class="o">=</span> <span class="n">vd</span>
+	<span class="k">if</span> <span class="n">disp</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span> <span class="k">print</span> <span class="s">&#39;right bracket&#39;</span><span class="p">,</span> <span class="n">c</span><span class="p">,</span> <span class="n">d</span><span class="p">,</span> <span class="n">vc</span><span class="p">,</span> <span class="n">vd</span>
+	<span class="k">if</span> <span class="n">vd</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="ow">and</span> <span class="n">vc</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">:</span>
+		<span class="n">rightroot</span> <span class="o">=</span> <span class="n">scipy</span><span class="o">.</span><span class="n">optimize</span><span class="o">.</span><span class="n">brentq</span><span class="p">(</span><span class="n">renormedfunc</span><span class="p">,</span> <span class="n">c</span><span class="p">,</span> <span class="n">d</span><span class="p">,</span> <span class="n">rtol</span><span class="o">=</span><span class="n">ftol</span><span class="p">)</span>
+	<span class="k">else</span><span class="p">:</span>
+		<span class="k">if</span> <span class="n">disp</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span> <span class="k">print</span> <span class="s">&#39;WARNING: border problem found.&#39;</span>
+		<span class="n">rightroot</span> <span class="o">=</span> <span class="n">d</span>
+	<span class="k">if</span> <span class="n">disp</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span> <span class="k">print</span> <span class="s">&#39;right root&#39;</span><span class="p">,</span> <span class="n">rightroot</span>
+	
+	<span class="k">assert</span> <span class="n">leftroot</span> <span class="o">&lt;</span> <span class="n">rightroot</span>
+
+	<span class="k">if</span> <span class="n">disp</span> <span class="o">&gt;</span> <span class="mi">2</span><span class="p">:</span>
+		<span class="n">fullvals</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="nb">sorted</span><span class="p">(</span><span class="n">cache</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">x</span><span class="p">[</span><span class="mi">0</span><span class="p">]))</span>
+		<span class="n">fullvals</span><span class="p">[:,</span><span class="mi">1</span><span class="p">]</span> <span class="o">-=</span> <span class="n">vi</span> <span class="o">+</span> <span class="mi">1</span>
+		<span class="n">plt</span><span class="o">.</span><span class="n">figure</span><span class="p">()</span>
+		<span class="n">plt</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">fullvals</span><span class="p">[:,</span><span class="mi">0</span><span class="p">],</span> <span class="n">fullvals</span><span class="p">[:,</span><span class="mi">1</span><span class="p">],</span> <span class="s">&#39;s&#39;</span><span class="p">)</span>
+		<span class="n">plt</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">vals</span><span class="p">[:,</span><span class="mi">0</span><span class="p">],</span> <span class="n">vals</span><span class="p">[:,</span><span class="mi">1</span><span class="p">],</span> <span class="s">&#39;o&#39;</span><span class="p">)</span>
+		<span class="n">plt</span><span class="o">.</span><span class="n">xlim</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">d</span><span class="p">)</span>
+		<span class="n">plt</span><span class="o">.</span><span class="n">ylim</span><span class="p">(</span><span class="nb">min</span><span class="p">(</span><span class="n">va</span><span class="p">,</span> <span class="n">vb</span><span class="p">,</span> <span class="n">vc</span><span class="p">,</span> <span class="n">vd</span><span class="p">),</span> <span class="nb">max</span><span class="p">(</span><span class="n">va</span><span class="p">,</span> <span class="n">vb</span><span class="p">,</span> <span class="n">vc</span><span class="p">,</span> <span class="n">vd</span><span class="p">))</span>
+		<span class="n">ymin</span><span class="p">,</span> <span class="n">ymax</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">ylim</span><span class="p">()</span>
+		<span class="n">plt</span><span class="o">.</span><span class="n">vlines</span><span class="p">([</span><span class="n">leftroot</span><span class="p">,</span> <span class="n">rightroot</span><span class="p">],</span> <span class="n">ymin</span><span class="p">,</span> <span class="n">ymax</span><span class="p">,</span> <span class="n">linestyles</span><span class="o">=</span><span class="s">&#39;dotted&#39;</span><span class="p">)</span>
+		<span class="n">plt</span><span class="o">.</span><span class="n">savefig</span><span class="p">(</span><span class="s">&#39;cache_brent.pdf&#39;</span><span class="p">)</span>
+
+	<span class="k">return</span> <span class="n">leftroot</span><span class="p">,</span> <span class="n">rightroot</span>
+	
+	
+	
+	
+	
+</pre></div></div>
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li><a href="../../index.html">jbopt 0.1 documentation</a> &raquo;</li>
+          <li><a href="../index.html" >Module code</a> &raquo;</li>
+          <li><a href="../jbopt.html" >jbopt</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright 2013, Johannes Buchner.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.1.3.
+    </div>
+  </body>
+</html>

@@ -1,0 +1,258 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>jbopt.mcmc &mdash; jbopt 0.1 documentation</title>
+    
+    <link rel="stylesheet" href="../../_static/nature.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../',
+        VERSION:     '0.1',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../_static/doctools.js"></script>
+    <link rel="top" title="jbopt 0.1 documentation" href="../../index.html" />
+    <link rel="up" title="jbopt" href="../jbopt.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li><a href="../../index.html">jbopt 0.1 documentation</a> &raquo;</li>
+          <li><a href="../index.html" >Module code</a> &raquo;</li>
+          <li><a href="../jbopt.html" accesskey="U">jbopt</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <h1>Source code for jbopt.mcmc</h1><div class="highlight"><pre>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">MCMC</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="kn">import</span> <span class="nn">numpy</span>
+
+<div class="viewcode-block" id="mcmc_advance"><a class="viewcode-back" href="../../doc.html#jbopt.mcmc.mcmc_advance">[docs]</a><span class="k">def</span> <span class="nf">mcmc_advance</span><span class="p">(</span><span class="n">start</span><span class="p">,</span> <span class="n">stdevs</span><span class="p">,</span> <span class="n">logp</span><span class="p">,</span> <span class="n">nsteps</span> <span class="o">=</span> <span class="mf">1e300</span><span class="p">,</span> <span class="n">adapt</span><span class="o">=</span><span class="bp">True</span><span class="p">,</span> <span class="n">callback</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+	<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">	generic Metropolis MCMC. Advances the chain by nsteps.</span>
+<span class="sd">	</span>
+<span class="sd">	@adapt: enables adaptive stepwidth alteration (converges).</span>
+<span class="sd">	&quot;&quot;&quot;</span>
+	<span class="kn">import</span> <span class="nn">scipy</span>
+	<span class="kn">from</span> <span class="nn">numpy</span> <span class="kn">import</span> <span class="n">log</span>
+	<span class="kn">import</span> <span class="nn">progressbar</span>
+	
+	<span class="n">prob</span> <span class="o">=</span> <span class="n">logp</span><span class="p">(</span><span class="n">start</span><span class="p">)</span>
+	<span class="n">chain</span> <span class="o">=</span> <span class="p">[</span><span class="n">start</span><span class="p">]</span>
+	<span class="n">accepts</span> <span class="o">=</span> <span class="p">[</span><span class="bp">True</span><span class="p">]</span>
+	<span class="n">probs</span> <span class="o">=</span> <span class="p">[</span><span class="n">prob</span><span class="p">]</span>
+	<span class="k">assert</span> <span class="ow">not</span> <span class="n">numpy</span><span class="o">.</span><span class="n">isnan</span><span class="p">(</span><span class="n">start</span><span class="p">)</span><span class="o">.</span><span class="n">any</span><span class="p">()</span>
+	<span class="k">assert</span> <span class="ow">not</span> <span class="n">numpy</span><span class="o">.</span><span class="n">isnan</span><span class="p">(</span><span class="n">stdevs</span><span class="p">)</span><span class="o">.</span><span class="n">any</span><span class="p">()</span>
+	
+	<span class="n">i</span> <span class="o">=</span> <span class="mi">0</span>
+	<span class="n">widgets</span><span class="o">=</span><span class="p">[</span><span class="s">&#39;AR&#39;</span><span class="p">,</span> <span class="n">progressbar</span><span class="o">.</span><span class="n">Percentage</span><span class="p">(),</span> <span class="n">progressbar</span><span class="o">.</span><span class="n">Counter</span><span class="p">(</span><span class="s">&#39;</span><span class="si">%5d</span><span class="s">&#39;</span><span class="p">),</span>
+		<span class="n">progressbar</span><span class="o">.</span><span class="n">Bar</span><span class="p">(),</span> <span class="n">progressbar</span><span class="o">.</span><span class="n">ETA</span><span class="p">()]</span>
+	<span class="n">pbar</span> <span class="o">=</span> <span class="n">progressbar</span><span class="o">.</span><span class="n">ProgressBar</span><span class="p">(</span><span class="n">widgets</span><span class="o">=</span><span class="n">widgets</span><span class="p">,</span>
+		<span class="n">maxval</span><span class="o">=</span><span class="n">nsteps</span><span class="p">)</span><span class="o">.</span><span class="n">start</span><span class="p">()</span>
+
+	<span class="n">prev</span> <span class="o">=</span> <span class="n">start</span>
+	<span class="n">prev_prob</span> <span class="o">=</span> <span class="n">prob</span>
+	<span class="k">print</span> <span class="s">&#39;MCMC: start at prob&#39;</span><span class="p">,</span> <span class="n">prob</span>
+	<span class="n">stepchange</span> <span class="o">=</span> <span class="mf">0.1</span>
+	<span class="k">while</span> <span class="nb">len</span><span class="p">(</span><span class="n">chain</span><span class="p">)</span> <span class="o">&lt;</span> <span class="n">nsteps</span><span class="p">:</span>
+		<span class="n">i</span> <span class="o">=</span> <span class="n">i</span> <span class="o">+</span> <span class="mi">1</span>
+		<span class="nb">next</span> <span class="o">=</span> <span class="n">scipy</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">normal</span><span class="p">(</span><span class="n">prev</span><span class="p">,</span> <span class="n">stdevs</span><span class="p">)</span>
+		<span class="n">next_prob</span> <span class="o">=</span> <span class="n">logp</span><span class="p">(</span><span class="nb">next</span><span class="p">)</span>
+		<span class="k">assert</span> <span class="ow">not</span> <span class="n">numpy</span><span class="o">.</span><span class="n">isnan</span><span class="p">(</span><span class="nb">next</span><span class="p">)</span><span class="o">.</span><span class="n">any</span><span class="p">()</span>
+		<span class="k">assert</span> <span class="ow">not</span> <span class="n">numpy</span><span class="o">.</span><span class="n">isnan</span><span class="p">(</span><span class="n">next_prob</span><span class="p">)</span><span class="o">.</span><span class="n">any</span><span class="p">()</span>
+		<span class="n">delta</span> <span class="o">=</span> <span class="n">next_prob</span> <span class="o">-</span> <span class="n">prev_prob</span>
+		<span class="n">dice</span> <span class="o">=</span> <span class="n">log</span><span class="p">(</span><span class="n">scipy</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">uniform</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">))</span>
+		<span class="n">accept</span> <span class="o">=</span> <span class="n">delta</span> <span class="o">&gt;</span> <span class="n">dice</span>
+		<span class="k">if</span> <span class="n">accept</span><span class="p">:</span>
+			<span class="n">prev</span> <span class="o">=</span> <span class="nb">next</span>
+			<span class="n">prev_prob</span> <span class="o">=</span> <span class="n">next_prob</span>
+			<span class="k">if</span> <span class="n">adapt</span><span class="p">:</span> <span class="n">stdevs</span> <span class="o">*=</span> <span class="p">(</span><span class="mi">1</span> <span class="o">+</span> <span class="n">stepchange</span><span class="p">)</span>
+		<span class="k">else</span><span class="p">:</span>
+			<span class="k">if</span> <span class="n">adapt</span><span class="p">:</span> <span class="n">stdevs</span> <span class="o">*=</span> <span class="p">(</span><span class="mi">1</span> <span class="o">+</span> <span class="n">stepchange</span><span class="p">)</span><span class="o">**</span><span class="p">(</span><span class="o">-</span><span class="mf">0.4</span><span class="p">)</span> <span class="c"># aiming for 40% acceptance</span>
+		<span class="k">if</span> <span class="n">callback</span><span class="p">:</span> <span class="n">callback</span><span class="p">(</span><span class="n">prev_prob</span><span class="p">,</span> <span class="n">prev</span><span class="p">,</span> <span class="n">accept</span><span class="p">)</span>
+		<span class="n">chain</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">prev</span><span class="p">)</span>
+		<span class="n">accepts</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">accept</span><span class="p">)</span>
+		<span class="n">probs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">prev_prob</span><span class="p">)</span>
+		<span class="k">if</span> <span class="n">adapt</span><span class="p">:</span> <span class="n">stepchange</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="mf">0.1</span><span class="p">,</span> <span class="mf">10.</span> <span class="o">/</span> <span class="n">i</span><span class="p">)</span>
+		<span class="c">#print &#39;STDEV&#39;, stdevs[:5], stepchange</span>
+		
+		<span class="c"># compute stats</span>
+		<span class="n">widgets</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="s">&#39;AR: </span><span class="si">%.03f</span><span class="s">&#39;</span> <span class="o">%</span> <span class="n">numpy</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">numpy</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">accepts</span><span class="p">[</span><span class="nb">len</span><span class="p">(</span><span class="n">accepts</span><span class="p">)</span><span class="o">/</span><span class="mi">3</span><span class="p">:])</span><span class="o">+</span><span class="mi">0</span><span class="p">)</span>
+		<span class="n">pbar</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">pbar</span><span class="o">.</span><span class="n">currval</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span>
+	<span class="n">pbar</span><span class="o">.</span><span class="n">finish</span><span class="p">()</span>
+	
+	<span class="k">return</span> <span class="n">chain</span><span class="p">,</span> <span class="n">probs</span><span class="p">,</span> <span class="n">accepts</span><span class="p">,</span> <span class="n">stdevs</span>
+</div>
+<div class="viewcode-block" id="mcmc"><a class="viewcode-back" href="../../doc.html#jbopt.mcmc.mcmc">[docs]</a><span class="k">def</span> <span class="nf">mcmc</span><span class="p">(</span><span class="n">transform</span><span class="p">,</span> <span class="n">loglikelihood</span><span class="p">,</span> <span class="n">parameter_names</span><span class="p">,</span> <span class="n">nsteps</span><span class="o">=</span><span class="mi">40000</span><span class="p">,</span> <span class="n">nburn</span><span class="o">=</span><span class="mi">400</span><span class="p">,</span> 
+		<span class="n">stdevs</span><span class="o">=</span><span class="mf">0.1</span><span class="p">,</span> <span class="n">start</span> <span class="o">=</span> <span class="mf">0.5</span><span class="p">,</span> <span class="o">**</span><span class="n">problem</span><span class="p">):</span>
+	<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd"> 	Metropolis Hastings MCMC</span>
+
+<span class="sd">	with automatic step width adaption. </span>
+<span class="sd">	Burnin period is also used to guess steps.</span>
+<span class="sd">	</span>
+<span class="sd">	@nburn: number of burnin steps</span>
+<span class="sd">	@stdevs: step widths to start with</span>
+<span class="sd">	</span>
+<span class="sd">	&quot;&quot;&quot;</span>
+	
+	
+	<span class="k">if</span> <span class="s">&#39;seed&#39;</span> <span class="ow">in</span> <span class="n">problem</span><span class="p">:</span>
+		<span class="n">numpy</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">seed</span><span class="p">(</span><span class="n">problem</span><span class="p">[</span><span class="s">&#39;seed&#39;</span><span class="p">])</span>
+	<span class="n">n_params</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">parameter_names</span><span class="p">)</span>
+	
+	<span class="k">def</span> <span class="nf">like</span><span class="p">(</span><span class="n">cube</span><span class="p">):</span>
+		<span class="n">cube</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">cube</span><span class="p">)</span>
+		<span class="k">if</span> <span class="p">(</span><span class="n">cube</span> <span class="o">&lt;=</span> <span class="mf">1e-10</span><span class="p">)</span><span class="o">.</span><span class="n">any</span><span class="p">()</span> <span class="ow">or</span> <span class="p">(</span><span class="n">cube</span> <span class="o">&gt;=</span> <span class="mi">1</span><span class="o">-</span><span class="mf">1e-10</span><span class="p">)</span><span class="o">.</span><span class="n">any</span><span class="p">():</span>
+			<span class="k">return</span> <span class="o">-</span><span class="mf">1e100</span>
+		<span class="n">params</span> <span class="o">=</span> <span class="n">transform</span><span class="p">(</span><span class="n">cube</span><span class="p">)</span>
+		<span class="k">return</span> <span class="n">loglikelihood</span><span class="p">(</span><span class="n">params</span><span class="p">)</span>
+	
+	<span class="n">start</span> <span class="o">=</span> <span class="n">start</span> <span class="o">+</span> <span class="n">numpy</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">n_params</span><span class="p">)</span>
+	<span class="n">stdevs</span> <span class="o">=</span> <span class="n">stdevs</span> <span class="o">+</span> <span class="n">numpy</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">n_params</span><span class="p">)</span>
+
+	<span class="k">def</span> <span class="nf">compute_stepwidths</span><span class="p">(</span><span class="n">chain</span><span class="p">):</span>
+		<span class="k">return</span> <span class="n">numpy</span><span class="o">.</span><span class="n">std</span><span class="p">(</span><span class="n">chain</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span> <span class="o">/</span> <span class="mi">3</span>
+
+	<span class="kn">import</span> <span class="nn">matplotlib.pyplot</span> <span class="kn">as</span> <span class="nn">plt</span>
+	<span class="n">plt</span><span class="o">.</span><span class="n">figure</span><span class="p">(</span><span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">7</span><span class="p">,</span> <span class="mi">7</span><span class="p">))</span>
+	<span class="n">steps</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">0.1</span><span class="p">]</span><span class="o">*</span><span class="p">(</span><span class="n">n_params</span><span class="p">))</span>
+	<span class="k">print</span> <span class="s">&#39;burn-in (1/2)...&#39;</span>
+	<span class="n">chain</span><span class="p">,</span> <span class="n">prob</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">steps_</span> <span class="o">=</span> <span class="n">mcmc_advance</span><span class="p">(</span><span class="n">start</span><span class="p">,</span> <span class="n">steps</span><span class="p">,</span> <span class="n">like</span><span class="p">,</span> <span class="n">nsteps</span><span class="o">=</span><span class="n">nburn</span> <span class="o">/</span> <span class="mi">2</span><span class="p">,</span> <span class="n">adapt</span><span class="o">=</span><span class="bp">True</span><span class="p">)</span>
+	<span class="n">steps</span> <span class="o">=</span> <span class="n">compute_stepwidths</span><span class="p">(</span><span class="n">chain</span><span class="p">)</span>
+	<span class="k">print</span> <span class="s">&#39;burn-in (2/2)...&#39;</span>
+	<span class="n">chain</span><span class="p">,</span> <span class="n">prob</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">steps_</span> <span class="o">=</span> <span class="n">mcmc_advance</span><span class="p">(</span><span class="n">chain</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">],</span> <span class="n">steps</span><span class="p">,</span> <span class="n">like</span><span class="p">,</span> <span class="n">nsteps</span><span class="o">=</span><span class="n">nburn</span> <span class="o">/</span> <span class="mi">2</span><span class="p">,</span> <span class="n">adapt</span><span class="o">=</span><span class="bp">True</span><span class="p">)</span>
+	<span class="n">steps</span> <span class="o">=</span> <span class="n">compute_stepwidths</span><span class="p">(</span><span class="n">chain</span><span class="p">)</span>
+	<span class="k">print</span> <span class="s">&#39;recording chain ...&#39;</span>
+	<span class="n">chain</span><span class="p">,</span> <span class="n">prob</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">steps_</span> <span class="o">=</span> <span class="n">mcmc_advance</span><span class="p">(</span><span class="n">chain</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">],</span> <span class="n">steps</span><span class="p">,</span> <span class="n">like</span><span class="p">,</span> <span class="n">nsteps</span><span class="o">=</span><span class="n">nsteps</span><span class="p">)</span>
+	<span class="n">chain</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">chain</span><span class="p">)</span>
+
+	<span class="n">i</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">argmax</span><span class="p">(</span><span class="n">prob</span><span class="p">)</span>
+	<span class="n">final</span> <span class="o">=</span> <span class="n">chain</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+	<span class="k">print</span> <span class="s">&#39;postprocessing...&#39;</span>
+	<span class="n">chain</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">transform</span><span class="p">(</span><span class="n">params</span><span class="p">)</span> <span class="k">for</span> <span class="n">params</span> <span class="ow">in</span> <span class="n">chain</span><span class="p">])</span>
+	
+	<span class="k">return</span> <span class="nb">dict</span><span class="p">(</span><span class="n">start</span><span class="o">=</span><span class="n">chain</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">],</span> <span class="n">maximum</span><span class="o">=</span><span class="n">chain</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="n">seeds</span><span class="o">=</span><span class="p">[</span><span class="n">final</span><span class="p">,</span> <span class="n">chain</span><span class="p">[</span><span class="n">i</span><span class="p">]],</span> <span class="n">chain</span><span class="o">=</span><span class="n">chain</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s">&#39;Metropolis MCMC&#39;</span><span class="p">)</span>
+</div>
+<div class="viewcode-block" id="ensemble"><a class="viewcode-back" href="../../doc.html#jbopt.mcmc.ensemble">[docs]</a><span class="k">def</span> <span class="nf">ensemble</span><span class="p">(</span><span class="n">transform</span><span class="p">,</span> <span class="n">loglikelihood</span><span class="p">,</span> <span class="n">parameter_names</span><span class="p">,</span> <span class="n">nsteps</span><span class="o">=</span><span class="mi">40000</span><span class="p">,</span> <span class="n">nburn</span><span class="o">=</span><span class="mi">400</span><span class="p">,</span> 
+		<span class="n">start</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span> <span class="o">**</span><span class="n">problem</span><span class="p">):</span>
+	<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">	Ensemble MCMC</span>
+<span class="sd">	</span>
+<span class="sd">	via `emcee &lt;http://dan.iel.fm/emcee/&gt;`_</span>
+<span class="sd">	&quot;&quot;&quot;</span>
+	<span class="kn">import</span> <span class="nn">emcee</span>
+	<span class="kn">import</span> <span class="nn">progressbar</span>
+	<span class="k">if</span> <span class="s">&#39;seed&#39;</span> <span class="ow">in</span> <span class="n">problem</span><span class="p">:</span>
+		<span class="n">numpy</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">seed</span><span class="p">(</span><span class="n">problem</span><span class="p">[</span><span class="s">&#39;seed&#39;</span><span class="p">])</span>
+	<span class="n">n_params</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">parameter_names</span><span class="p">)</span>
+	<span class="n">nwalkers</span> <span class="o">=</span> <span class="mi">50</span> <span class="o">+</span> <span class="n">n_params</span> <span class="o">*</span> <span class="mi">2</span>
+	<span class="n">p0</span> <span class="o">=</span> <span class="p">[</span><span class="n">numpy</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">rand</span><span class="p">(</span><span class="n">n_params</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">xrange</span><span class="p">(</span><span class="n">nwalkers</span><span class="p">)]</span>
+	<span class="n">start</span> <span class="o">=</span> <span class="n">start</span> <span class="o">+</span> <span class="n">numpy</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">n_params</span><span class="p">)</span>
+	<span class="n">p0</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="n">start</span>
+
+	<span class="k">def</span> <span class="nf">like</span><span class="p">(</span><span class="n">cube</span><span class="p">):</span>
+		<span class="n">cube</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">cube</span><span class="p">)</span>
+		<span class="k">if</span> <span class="p">(</span><span class="n">cube</span> <span class="o">&lt;=</span> <span class="mf">1e-10</span><span class="p">)</span><span class="o">.</span><span class="n">any</span><span class="p">()</span> <span class="ow">or</span> <span class="p">(</span><span class="n">cube</span> <span class="o">&gt;=</span> <span class="mi">1</span><span class="o">-</span><span class="mf">1e-10</span><span class="p">)</span><span class="o">.</span><span class="n">any</span><span class="p">():</span>
+			<span class="k">return</span> <span class="o">-</span><span class="mf">1e100</span>
+		<span class="n">params</span> <span class="o">=</span> <span class="n">transform</span><span class="p">(</span><span class="n">cube</span><span class="p">)</span>
+		<span class="k">return</span> <span class="n">loglikelihood</span><span class="p">(</span><span class="n">params</span><span class="p">)</span>
+	
+	<span class="n">sampler</span> <span class="o">=</span> <span class="n">emcee</span><span class="o">.</span><span class="n">EnsembleSampler</span><span class="p">(</span><span class="n">nwalkers</span><span class="p">,</span> <span class="n">n_params</span><span class="p">,</span> <span class="n">like</span><span class="p">)</span>
+
+	<span class="k">print</span> <span class="s">&#39;burn-in...&#39;</span>
+	<span class="n">pos</span><span class="p">,</span> <span class="n">prob</span><span class="p">,</span> <span class="n">state</span> <span class="o">=</span> <span class="n">sampler</span><span class="o">.</span><span class="n">run_mcmc</span><span class="p">(</span><span class="n">p0</span><span class="p">,</span> <span class="n">nburn</span> <span class="o">/</span> <span class="n">nwalkers</span><span class="p">)</span>
+
+	<span class="c"># Reset the chain to remove the burn-in samples.</span>
+	<span class="n">sampler</span><span class="o">.</span><span class="n">reset</span><span class="p">()</span>
+
+	<span class="k">print</span> <span class="s">&#39;running ...&#39;</span>
+	<span class="c"># Starting from the final position in the burn-in chain, sample</span>
+	<span class="n">pbar</span> <span class="o">=</span> <span class="n">progressbar</span><span class="o">.</span><span class="n">ProgressBar</span><span class="p">(</span>
+		<span class="n">widgets</span><span class="o">=</span><span class="p">[</span><span class="n">progressbar</span><span class="o">.</span><span class="n">Percentage</span><span class="p">(),</span> <span class="n">progressbar</span><span class="o">.</span><span class="n">Counter</span><span class="p">(</span><span class="s">&#39;</span><span class="si">%5d</span><span class="s">&#39;</span><span class="p">),</span>
+		<span class="n">progressbar</span><span class="o">.</span><span class="n">Bar</span><span class="p">(),</span> <span class="n">progressbar</span><span class="o">.</span><span class="n">ETA</span><span class="p">()],</span>
+		<span class="n">maxval</span><span class="o">=</span><span class="n">nsteps</span><span class="p">)</span><span class="o">.</span><span class="n">start</span><span class="p">()</span>
+	<span class="k">for</span> <span class="n">results</span> <span class="ow">in</span> <span class="n">sampler</span><span class="o">.</span><span class="n">sample</span><span class="p">(</span><span class="n">pos</span><span class="p">,</span> <span class="n">iterations</span><span class="o">=</span><span class="n">nsteps</span> <span class="o">/</span> <span class="n">nwalkers</span><span class="p">,</span> <span class="n">rstate0</span><span class="o">=</span><span class="n">state</span><span class="p">):</span>
+		<span class="n">pbar</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">pbar</span><span class="o">.</span><span class="n">currval</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span>
+	<span class="n">pbar</span><span class="o">.</span><span class="n">finish</span><span class="p">()</span>
+
+	<span class="k">print</span> <span class="s">&quot;Mean acceptance fraction:&quot;</span><span class="p">,</span> <span class="n">numpy</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">sampler</span><span class="o">.</span><span class="n">acceptance_fraction</span><span class="p">)</span>
+
+	<span class="n">chain</span> <span class="o">=</span> <span class="n">sampler</span><span class="o">.</span><span class="n">flatchain</span>
+	
+	<span class="n">final</span> <span class="o">=</span> <span class="n">chain</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+	<span class="k">print</span> <span class="s">&#39;postprocessing...&#39;</span>
+	<span class="n">chain</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">transform</span><span class="p">(</span><span class="n">params</span><span class="p">)</span> <span class="k">for</span> <span class="n">params</span> <span class="ow">in</span> <span class="n">chain</span><span class="p">])</span>
+	
+	<span class="k">return</span> <span class="nb">dict</span><span class="p">(</span><span class="n">start</span><span class="o">=</span><span class="n">final</span><span class="p">,</span> <span class="n">chain</span><span class="o">=</span><span class="n">chain</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s">&#39;Ensemble MCMC&#39;</span><span class="p">)</span>
+</pre></div></div>
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li><a href="../../index.html">jbopt 0.1 documentation</a> &raquo;</li>
+          <li><a href="../index.html" >Module code</a> &raquo;</li>
+          <li><a href="../jbopt.html" >jbopt</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright 2013, Johannes Buchner.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.1.3.
+    </div>
+  </body>
+</html>

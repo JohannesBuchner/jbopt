@@ -1,0 +1,365 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>API documentation &mdash; jbopt 0.1 documentation</title>
+    
+    <link rel="stylesheet" href="_static/nature.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '',
+        VERSION:     '0.1',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <link rel="top" title="jbopt 0.1 documentation" href="index.html" />
+    <link rel="prev" title="Example code" href="example.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="example.html" title="Example code"
+             accesskey="P">previous</a> |</li>
+        <li><a href="index.html">jbopt 0.1 documentation</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <div class="section" id="api-documentation">
+<h1>API documentation<a class="headerlink" href="#api-documentation" title="Permalink to this headline">¶</a></h1>
+<div class="toctree-wrapper compound">
+<ul class="simple">
+</ul>
+</div>
+<div class="section" id="module-jbopt.classic">
+<span id="heuristic-optimization-algorithms"></span><span id="opt"></span><h2>Heuristic optimization algorithms<a class="headerlink" href="#module-jbopt.classic" title="Permalink to this headline">¶</a></h2>
+<p>Classic optimization methods</p>
+<dl class="function">
+<dt id="jbopt.classic.classical">
+<tt class="descclassname">jbopt.classic.</tt><tt class="descname">classical</tt><big>(</big><em>transform</em>, <em>loglikelihood</em>, <em>parameter_names</em>, <em>start=0.5</em>, <em>ftol=0.1</em>, <em>disp=0</em>, <em>nsteps=40000</em>, <em>method='neldermead'</em>, <em>**args</em><big>)</big><a class="reference internal" href="_modules/jbopt/classic.html#classical"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#jbopt.classic.classical" title="Permalink to this definition">¶</a></dt>
+<dd><p><strong>Classic optimization methods</strong></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>start</strong> &#8211; start position vector (before transform)</li>
+<li><strong>ftol</strong> &#8211; accuracy required to stop at optimum</li>
+<li><strong>disp</strong> &#8211; verbosity</li>
+<li><strong>nsteps</strong> &#8211; number of steps</li>
+<li><strong>method</strong> &#8211; string
+neldermead, cobyla (via <a class="reference external" href="http://docs.scipy.org/doc/scipy/reference/tutorial/optimize.html">scipy.optimize</a>)
+bobyqa, ralg, algencan, ipopt, mma, auglag and many others from the OpenOpt framework (via <a class="reference external" href="http://openopt.org/NLP">openopt.NLP</a>)
+minuit (via <a class="reference external" href="https://code.google.com/p/pyminuit/">PyMinuit</a>)</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="jbopt.classic.onebyone">
+<tt class="descclassname">jbopt.classic.</tt><tt class="descname">onebyone</tt><big>(</big><em>transform</em>, <em>loglikelihood</em>, <em>parameter_names</em>, <em>start=0.5</em>, <em>ftol=0.1</em>, <em>disp=0</em>, <em>nsteps=40000</em>, <em>parallel=False</em>, <em>find_uncertainties=False</em>, <em>**args</em><big>)</big><a class="reference internal" href="_modules/jbopt/classic.html#onebyone"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#jbopt.classic.onebyone" title="Permalink to this definition">¶</a></dt>
+<dd><p><strong>Convex optimization based on Brent&#8217;s method</strong></p>
+<p>A strict assumption of one optimum between the parameter limits is used.
+The bounds are narrowed until it is found, i.e. the likelihood function is flat
+within the bounds.
+* If optimum outside bracket, expands bracket until contained.
+* Thus guaranteed to return local optimum.
+* Supports parallelization (multiple parameters are treated independently)
+* Supports finding ML uncertainties (Delta-Chi^2=1)</p>
+<p>Very useful for 1-3d problems.
+Otherwise useful, reproducible/deterministic algorithm for finding the minimum in 
+well-behaved likelihoods, where the parameters are weakly independent,
+or to find a good starting point. 
+Optimizes each parameter in order, assuming they are largely independent.</p>
+<p>For 1-dimensional algorithm used, see <tt class="xref py py-func docutils literal"><span class="pre">jbopt.opt_grid()</span></tt></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>ftol</strong> &#8211; difference in values at which the function can be considered flat</li>
+<li><strong>compute_errors</strong> &#8211; compute standard deviation of gaussian around optimum</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+</div>
+<div class="section" id="module-jbopt.de">
+<span id="differential-evolution"></span><span id="de"></span><h2>Differential evolution<a class="headerlink" href="#module-jbopt.de" title="Permalink to this headline">¶</a></h2>
+<p>Differential evolution</p>
+<dl class="function">
+<dt id="jbopt.de.de">
+<tt class="descclassname">jbopt.de.</tt><tt class="descname">de</tt><big>(</big><em>output_basename</em>, <em>parameter_names</em>, <em>transform</em>, <em>loglikelihood</em>, <em>prior</em>, <em>nsteps=40000</em>, <em>vizfunc=None</em>, <em>printfunc=None</em>, <em>**problem</em><big>)</big><a class="reference internal" href="_modules/jbopt/de.html#de"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#jbopt.de.de" title="Permalink to this definition">¶</a></dt>
+<dd><p><strong>Differential evolution</strong></p>
+<p>via <a class="reference external" href="http://inspyred.github.io/">inspyred</a></p>
+<dl class="docutils">
+<dt>specially tuned. steady state replacement, n-point crossover, </dt>
+<dd>pop size 20, gaussian mutation noise 0.01 &amp; 1e-6.</dd>
+</dl>
+<p>stores intermediate results (can be used for resume, see seeds)</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>start</strong> &#8211; start point</li>
+<li><strong>seeds</strong> &#8211; list of start points</li>
+<li><strong>vizfunc</strong> &#8211; callback to do visualization of current best solution</li>
+<li><strong>printfunc</strong> &#8211; callback to summarize current best solution</li>
+<li><strong>seed</strong> &#8211; RNG initialization (if set)</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+</div>
+<div class="section" id="module-jbopt.mcmc">
+<span id="markov-chain-monte-carlo-methods"></span><span id="mcmc"></span><h2>Markov Chain Monte Carlo methods<a class="headerlink" href="#module-jbopt.mcmc" title="Permalink to this headline">¶</a></h2>
+<p>MCMC</p>
+<dl class="function">
+<dt id="jbopt.mcmc.ensemble">
+<tt class="descclassname">jbopt.mcmc.</tt><tt class="descname">ensemble</tt><big>(</big><em>transform</em>, <em>loglikelihood</em>, <em>parameter_names</em>, <em>nsteps=40000</em>, <em>nburn=400</em>, <em>start=0.5</em>, <em>**problem</em><big>)</big><a class="reference internal" href="_modules/jbopt/mcmc.html#ensemble"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#jbopt.mcmc.ensemble" title="Permalink to this definition">¶</a></dt>
+<dd><p><strong>Ensemble MCMC</strong></p>
+<p>via <a class="reference external" href="http://dan.iel.fm/emcee/">emcee</a></p>
+</dd></dl>
+
+<dl class="function">
+<dt id="jbopt.mcmc.mcmc">
+<tt class="descclassname">jbopt.mcmc.</tt><tt class="descname">mcmc</tt><big>(</big><em>transform</em>, <em>loglikelihood</em>, <em>parameter_names</em>, <em>nsteps=40000</em>, <em>nburn=400</em>, <em>stdevs=0.1</em>, <em>start=0.5</em>, <em>**problem</em><big>)</big><a class="reference internal" href="_modules/jbopt/mcmc.html#mcmc"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#jbopt.mcmc.mcmc" title="Permalink to this definition">¶</a></dt>
+<dd><p><strong>Metropolis Hastings MCMC</strong></p>
+<p>with automatic step width adaption. 
+Burnin period is also used to guess steps.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>nburn</strong> &#8211; number of burnin steps</li>
+<li><strong>stdevs</strong> &#8211; step widths to start with</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="jbopt.mcmc.mcmc_advance">
+<tt class="descclassname">jbopt.mcmc.</tt><tt class="descname">mcmc_advance</tt><big>(</big><em>start</em>, <em>stdevs</em>, <em>logp</em>, <em>nsteps=1e+300</em>, <em>adapt=True</em>, <em>callback=None</em><big>)</big><a class="reference internal" href="_modules/jbopt/mcmc.html#mcmc_advance"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#jbopt.mcmc.mcmc_advance" title="Permalink to this definition">¶</a></dt>
+<dd><p>Generic Metropolis MCMC. Advances the chain by nsteps.
+Called by <a class="reference internal" href="#jbopt.mcmc.mcmc" title="jbopt.mcmc.mcmc"><tt class="xref py py-func docutils literal"><span class="pre">mcmc()</span></tt></a></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>adapt</strong> &#8211; enables adaptive stepwidth alteration (converges).</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+</div>
+<div class="section" id="module-jbopt.mn">
+<span id="nested-sampling"></span><span id="mn"></span><h2>Nested Sampling<a class="headerlink" href="#module-jbopt.mn" title="Permalink to this headline">¶</a></h2>
+<p>MultiNest</p>
+<dl class="function">
+<dt id="jbopt.mn.multinest">
+<tt class="descclassname">jbopt.mn.</tt><tt class="descname">multinest</tt><big>(</big><em>parameter_names</em>, <em>transform</em>, <em>loglikelihood</em>, <em>output_basename</em>, <em>**problem</em><big>)</big><a class="reference internal" href="_modules/jbopt/mn.html#multinest"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#jbopt.mn.multinest" title="Permalink to this definition">¶</a></dt>
+<dd><p><strong>MultiNest Nested Sampling</strong></p>
+<p>via <a class="reference external" href="http://johannesbuchner.github.com/PyMultiNest/index.html">PyMultiNest</a>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>parameter_names</strong> &#8211; name of parameters; not directly used here, 
+but for multinest_marginal.py plotting tool.</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+</div>
+<div class="section" id="simple-custom-1d-methods">
+<span id="d"></span><h2>Simple, custom 1d methods<a class="headerlink" href="#simple-custom-1d-methods" title="Permalink to this headline">¶</a></h2>
+<p>2 custom algorithms are implemented:</p>
+<ul>
+<li><p class="first"><a class="reference internal" href="#jbopt.independent.opt_normalizations" title="jbopt.independent.opt_normalizations"><tt class="xref py py-func docutils literal"><span class="pre">jbopt.independent.opt_normalizations()</span></tt></a></p>
+</li>
+<li><p class="first"><a class="reference internal" href="#jbopt.optimize1d.optimize" title="jbopt.optimize1d.optimize"><tt class="xref py py-func docutils literal"><span class="pre">jbopt.optimize1d.optimize()</span></tt></a> (used by <a class="reference internal" href="#jbopt.classic.onebyone" title="jbopt.classic.onebyone"><tt class="xref py py-func docutils literal"><span class="pre">jbopt.classic.onebyone()</span></tt></a>)</p>
+<blockquote>
+<div><span class="target" id="module-jbopt.optimize1d"></span><p>1D optimization, which should be robust against local flatness in the target function, 
+but also estimate errors on the final parameter.</p>
+<p>We know that there is only one minimum, and it is far from the constraints.</p>
+<dl class="function">
+<dt id="jbopt.optimize1d.optimize">
+<tt class="descclassname">jbopt.optimize1d.</tt><tt class="descname">optimize</tt><big>(</big><em>function</em>, <em>x0</em>, <em>cons=</em><span class="optional">[</span><span class="optional">]</span>, <em>ftol=0.2</em>, <em>disp=0</em>, <em>plot=False</em><big>)</big><a class="reference internal" href="_modules/jbopt/optimize1d.html#optimize"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#jbopt.optimize1d.optimize" title="Permalink to this definition">¶</a></dt>
+<dd><p><strong>Optimization method based on Brent&#8217;s method</strong></p>
+<p>First, a bracket (a b c) is sought that contains the minimum (b value is 
+smaller than both a or c).</p>
+<p>The bracket is then recursively halfed. Here we apply some modifications
+to ensure our suggested point is not too close to either a or c,
+because that could be problematic with the local approximation.
+Also, if the bracket does not seem to include the minimum,
+it is expanded generously in the right direction until it covers it.</p>
+<p>Thus, this function is fail safe, and will always find a local minimum.</p>
+</dd></dl>
+
+<span class="target" id="module-jbopt.independent"></span><p>Custom minimization algorithms in jbopt</p>
+<p>minimization routines that assume the parameters to be mostly independent from 
+each other, optimizing each parameter in turn.</p>
+<dl class="function">
+<dt id="jbopt.independent.opt_grid">
+<tt class="descclassname">jbopt.independent.</tt><tt class="descname">opt_grid</tt><big>(</big><em>params</em>, <em>func</em>, <em>limits</em>, <em>ftol=0.01</em>, <em>disp=0</em>, <em>compute_errors=True</em><big>)</big><a class="reference internal" href="_modules/jbopt/independent.html#opt_grid"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#jbopt.independent.opt_grid" title="Permalink to this definition">¶</a></dt>
+<dd><p>see <tt class="xref py py-func docutils literal"><span class="pre">optimize1d.optimize()</span></tt>, considers each parameter in order</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>ftol</strong> &#8211; difference in values at which the function can be considered flat</li>
+<li><strong>compute_errors</strong> &#8211; compute standard deviation of gaussian around optimum</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="jbopt.independent.opt_grid_parallel">
+<tt class="descclassname">jbopt.independent.</tt><tt class="descname">opt_grid_parallel</tt><big>(</big><em>params</em>, <em>func</em>, <em>limits</em>, <em>ftol=0.01</em>, <em>disp=0</em>, <em>compute_errors=True</em><big>)</big><a class="reference internal" href="_modules/jbopt/independent.html#opt_grid_parallel"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#jbopt.independent.opt_grid_parallel" title="Permalink to this definition">¶</a></dt>
+<dd><p>parallelized version of <a class="reference internal" href="#jbopt.independent.opt_grid" title="jbopt.independent.opt_grid"><tt class="xref py py-func docutils literal"><span class="pre">opt_grid()</span></tt></a></p>
+</dd></dl>
+
+<dl class="function">
+<dt id="jbopt.independent.opt_normalizations">
+<tt class="descclassname">jbopt.independent.</tt><tt class="descname">opt_normalizations</tt><big>(</big><em>params</em>, <em>func</em>, <em>limits</em>, <em>abandon_threshold=100</em>, <em>noimprovement_threshold=0.001</em>, <em>disp=0</em><big>)</big><a class="reference internal" href="_modules/jbopt/independent.html#opt_normalizations"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#jbopt.independent.opt_normalizations" title="Permalink to this definition">¶</a></dt>
+<dd><p><strong>optimization algorithm for scale variables (positive value of unknown magnitude)</strong></p>
+<p>Each parameter is a normalization of a feature, and its value is sought.
+The parameters are handled in order (assumed to be independent), 
+but a second round can be run.
+Various magnitudes of the normalization are tried. If the normalization converges
+to zero, the largest value yielding a comparable value is used.</p>
+<p>Optimizes each normalization parameter in rough steps 
+using multiples of 3 of start point
+to find reasonable starting values for another algorithm.</p>
+<p>parameters, minimization function, parameter space definition [(lo, hi) for i in params]</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>abandon_threshold</strong> &#8211; if in one direction the function increases by this much over the best value, 
+abort search in this direction</li>
+<li><strong>noimprovement_threshold</strong> &#8211; when decreasing the normalization, if the function increases by less than 
+this amount, abort search in this direction</li>
+<li><strong>disp</strong> &#8211; verbosity</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+</div></blockquote>
+</li>
+</ul>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="index.html">Table Of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">API documentation</a><ul>
+<li><a class="reference internal" href="#module-jbopt.classic">Heuristic optimization algorithms</a></li>
+<li><a class="reference internal" href="#module-jbopt.de">Differential evolution</a></li>
+<li><a class="reference internal" href="#module-jbopt.mcmc">Markov Chain Monte Carlo methods</a></li>
+<li><a class="reference internal" href="#module-jbopt.mn">Nested Sampling</a></li>
+<li><a class="reference internal" href="#simple-custom-1d-methods">Simple, custom 1d methods</a></li>
+</ul>
+</li>
+</ul>
+
+  <h4>Previous topic</h4>
+  <p class="topless"><a href="example.html"
+                        title="previous chapter">Example code</a></p>
+  <h3>This Page</h3>
+  <ul class="this-page-menu">
+    <li><a href="_sources/doc.txt"
+           rel="nofollow">Show Source</a></li>
+  </ul>
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="example.html" title="Example code"
+             >previous</a> |</li>
+        <li><a href="index.html">jbopt 0.1 documentation</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright 2013, Johannes Buchner.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.1.3.
+    </div>
+  </body>
+</html>

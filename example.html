@@ -1,0 +1,175 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>Example code &mdash; jbopt 0.1 documentation</title>
+    
+    <link rel="stylesheet" href="_static/nature.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '',
+        VERSION:     '0.1',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <link rel="top" title="jbopt 0.1 documentation" href="index.html" />
+    <link rel="next" title="API documentation" href="doc.html" />
+    <link rel="prev" title="Welcome to jbopt’s documentation!" href="index.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="doc.html" title="API documentation"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="index.html" title="Welcome to jbopt’s documentation!"
+             accesskey="P">previous</a> |</li>
+        <li><a href="index.html">jbopt 0.1 documentation</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <div class="section" id="example-code">
+<h1>Example code<a class="headerlink" href="#example-code" title="Permalink to this headline">¶</a></h1>
+<p>See <a class="reference internal" href="doc.html"><em>API documentation</em></a> for which methods are available and how to call them.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="c"># define the problem:</span>
+
+<span class="c">#   the log-likelihood function</span>
+<span class="c">#   use a 5-dimensional gaussian likelihood surface</span>
+<span class="n">centers</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">0.1</span><span class="p">,</span> <span class="mi">15</span><span class="p">,</span> <span class="mf">3.3</span><span class="p">,</span> <span class="mf">4.1</span><span class="p">,</span> <span class="mi">0</span><span class="p">])</span>
+<span class="n">sigmas</span>  <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">0.01</span><span class="p">,</span> <span class="mf">0.1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">10</span><span class="p">,</span> <span class="mi">10</span><span class="p">])</span>
+<span class="k">def</span> <span class="nf">loglikelihood</span><span class="p">(</span><span class="n">params</span><span class="p">):</span>
+        <span class="k">return</span> <span class="o">-</span><span class="mf">0.5</span> <span class="o">*</span> <span class="p">(((</span><span class="n">params</span> <span class="o">-</span> <span class="n">centers</span><span class="p">)</span> <span class="o">/</span> <span class="n">sigmas</span><span class="p">)</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
+
+<span class="c">#   define the parameter space, in this case between -50 and +50</span>
+<span class="c">#   also used in Bayesian methods for prior weighting</span>
+<span class="k">def</span> <span class="nf">transform</span><span class="p">(</span><span class="n">cube</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">numpy</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">cube</span><span class="p">)</span> <span class="o">*</span> <span class="mi">100</span> <span class="o">-</span> <span class="mi">50</span>
+
+<span class="c">#   define the prior weighting explicitly for some of the Bayesian methods</span>
+<span class="c">#   in this case uniform between -50 and +50</span>
+<span class="k">def</span> <span class="nf">prior</span><span class="p">(</span><span class="n">params</span><span class="p">):</span>
+        <span class="k">return</span> <span class="mi">0</span>
+
+<span class="kn">from</span> <span class="nn">jbopt.classic</span> <span class="kn">import</span> <span class="o">*</span>
+<span class="kn">from</span> <span class="nn">jbopt.mcmc</span> <span class="kn">import</span> <span class="o">*</span>
+<span class="kn">from</span> <span class="nn">jbopt.mn</span> <span class="kn">import</span> <span class="o">*</span>
+<span class="kn">from</span> <span class="nn">jbopt.de</span> <span class="kn">import</span> <span class="o">*</span>
+
+<span class="c"># the common parameters</span>
+<span class="n">args</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span>
+        <span class="n">loglikelihood</span><span class="o">=</span><span class="n">loglikelihood</span><span class="p">,</span> <span class="n">transform</span><span class="o">=</span><span class="n">transform</span><span class="p">,</span> <span class="n">prior</span><span class="o">=</span><span class="n">prior</span><span class="p">,</span>
+        <span class="n">parameter_names</span> <span class="o">=</span> <span class="p">[</span><span class="s">&#39;c</span><span class="si">%d</span><span class="s">&#39;</span> <span class="o">%</span> <span class="n">i</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">centers</span><span class="p">))],</span>
+        <span class="n">nsteps</span><span class="o">=</span><span class="mi">2000</span><span class="p">,</span> <span class="c"># maximum number of steps</span>
+        <span class="n">seed</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span>    <span class="c"># make output reproducible; set to -1 for random seed</span>
+        <span class="c"># disp = 1 # for more verbose output</span>
+<span class="p">)</span>
+
+<span class="c"># calling the various methods (common call interface)</span>
+<span class="n">ret</span> <span class="o">=</span> <span class="n">classical</span><span class="p">(</span><span class="n">method</span><span class="o">=</span><span class="s">&#39;neldermead&#39;</span><span class="p">,</span> <span class="o">**</span><span class="n">args</span><span class="p">)</span>
+
+<span class="k">for</span> <span class="n">method</span> <span class="ow">in</span> <span class="s">&#39;cobyla&#39;</span><span class="p">,</span> <span class="s">&#39;ralg&#39;</span><span class="p">,</span> <span class="s">&#39;mma&#39;</span><span class="p">,</span> <span class="s">&#39;auglag&#39;</span><span class="p">,</span> <span class="s">&#39;minuit&#39;</span><span class="p">:</span>
+        <span class="k">print</span> <span class="s">&#39;next method:&#39;</span><span class="p">,</span> <span class="n">method</span>
+        <span class="n">ret</span> <span class="o">=</span> <span class="n">classical</span><span class="p">(</span><span class="n">method</span><span class="o">=</span><span class="n">method</span><span class="p">,</span> <span class="o">**</span><span class="n">args</span><span class="p">)</span>
+
+<span class="n">ret</span> <span class="o">=</span> <span class="n">onebyone</span><span class="p">(</span><span class="o">**</span><span class="n">args</span><span class="p">)</span>
+<span class="n">ret</span> <span class="o">=</span> <span class="n">onebyone</span><span class="p">(</span><span class="n">parallel</span><span class="o">=</span><span class="bp">True</span><span class="p">,</span> <span class="n">find_uncertainties</span><span class="o">=</span><span class="bp">True</span><span class="p">,</span> <span class="o">**</span><span class="n">args</span><span class="p">)</span>
+<span class="n">ret</span> <span class="o">=</span> <span class="n">de</span><span class="p">(</span><span class="n">output_basename</span><span class="o">=</span><span class="s">&#39;test_all_de&#39;</span><span class="p">,</span> <span class="o">**</span><span class="n">args</span><span class="p">)</span>
+<span class="n">ret</span> <span class="o">=</span> <span class="n">mcmc</span><span class="p">(</span><span class="n">output_basename</span><span class="o">=</span><span class="s">&#39;test_all_mcmc&#39;</span><span class="p">,</span> <span class="o">**</span><span class="n">args</span><span class="p">)</span>
+<span class="n">ret</span> <span class="o">=</span> <span class="n">ensemble</span><span class="p">(</span><span class="n">output_basename</span><span class="o">=</span><span class="s">&#39;test_all_mcmc&#39;</span><span class="p">,</span> <span class="o">**</span><span class="n">args</span><span class="p">)</span>
+<span class="n">ret</span> <span class="o">=</span> <span class="n">multinest</span><span class="p">(</span><span class="n">output_basename</span><span class="o">=</span><span class="s">&#39;test_all_mn&#39;</span><span class="p">,</span> <span class="o">**</span><span class="n">args</span><span class="p">)</span>
+
+<span class="c"># analyse a return value (common output interface)</span>
+<span class="k">print</span> <span class="n">ret</span><span class="p">[</span><span class="s">&#39;method&#39;</span><span class="p">]</span> <span class="c"># method used</span>
+<span class="k">print</span> <span class="n">ret</span><span class="p">[</span><span class="s">&#39;start&#39;</span><span class="p">]</span>  <span class="c"># new ML value</span>
+<span class="k">print</span> <span class="n">ret</span><span class="p">[</span><span class="s">&#39;neval&#39;</span><span class="p">]</span>  <span class="c"># number of evaluations used</span>
+<span class="c"># not all methods provide also the following</span>
+<span class="k">print</span> <span class="n">ret</span><span class="p">[</span><span class="s">&#39;chain&#39;</span><span class="p">]</span>  <span class="c"># Markov Chain, samples drawn from posterior</span>
+<span class="k">print</span> <span class="n">ret</span><span class="p">[</span><span class="s">&#39;median&#39;</span><span class="p">]</span> <span class="c"># medians of the parameters</span>
+<span class="k">print</span> <span class="n">ret</span><span class="p">[</span><span class="s">&#39;stdev&#39;</span><span class="p">]</span>  <span class="c"># standard deviation uncertainty of the parameters</span>
+</pre></div>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+  <h4>Previous topic</h4>
+  <p class="topless"><a href="index.html"
+                        title="previous chapter">Welcome to jbopt&#8217;s documentation!</a></p>
+  <h4>Next topic</h4>
+  <p class="topless"><a href="doc.html"
+                        title="next chapter">API documentation</a></p>
+  <h3>This Page</h3>
+  <ul class="this-page-menu">
+    <li><a href="_sources/example.txt"
+           rel="nofollow">Show Source</a></li>
+  </ul>
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="doc.html" title="API documentation"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="index.html" title="Welcome to jbopt’s documentation!"
+             >previous</a> |</li>
+        <li><a href="index.html">jbopt 0.1 documentation</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright 2013, Johannes Buchner.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.1.3.
+    </div>
+  </body>
+</html>

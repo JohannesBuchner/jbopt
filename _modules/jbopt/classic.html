@@ -1,0 +1,293 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>jbopt.classic &mdash; jbopt 0.1 documentation</title>
+    
+    <link rel="stylesheet" href="../../_static/nature.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../',
+        VERSION:     '0.1',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../_static/doctools.js"></script>
+    <link rel="top" title="jbopt 0.1 documentation" href="../../index.html" />
+    <link rel="up" title="jbopt" href="../jbopt.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li><a href="../../index.html">jbopt 0.1 documentation</a> &raquo;</li>
+          <li><a href="../index.html" >Module code</a> &raquo;</li>
+          <li><a href="../jbopt.html" accesskey="U">jbopt</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <h1>Source code for jbopt.classic</h1><div class="highlight"><pre>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Classic optimization methods</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="kn">import</span> <span class="nn">numpy</span>
+<span class="kn">from</span> <span class="nn">independent</span> <span class="kn">import</span> <span class="n">opt_grid_parallel</span><span class="p">,</span> <span class="n">opt_grid</span>
+
+<div class="viewcode-block" id="classical"><a class="viewcode-back" href="../../doc.html#jbopt.classic.classical">[docs]</a><span class="k">def</span> <span class="nf">classical</span><span class="p">(</span><span class="n">transform</span><span class="p">,</span> <span class="n">loglikelihood</span><span class="p">,</span> <span class="n">parameter_names</span><span class="p">,</span> <span class="n">start</span> <span class="o">=</span> <span class="mf">0.5</span><span class="p">,</span> <span class="n">ftol</span><span class="o">=</span><span class="mf">0.1</span><span class="p">,</span> <span class="n">disp</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">nsteps</span><span class="o">=</span><span class="mi">40000</span><span class="p">,</span>
+	<span class="n">method</span><span class="o">=</span><span class="s">&#39;neldermead&#39;</span><span class="p">,</span> <span class="o">**</span><span class="n">args</span><span class="p">):</span>
+	<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Classic optimization methods</span>
+
+<span class="sd">	@start: start position vector (before transform)</span>
+<span class="sd">	@ftol: accuracy required to stop at optimum</span>
+<span class="sd">	@disp: verbosity</span>
+<span class="sd">	@nsteps: number of steps</span>
+<span class="sd">	@method: string</span>
+<span class="sd">		neldermead, cobyla (via `scipy.optimize &lt;http://docs.scipy.org/doc/scipy/reference/tutorial/optimize.html&gt;`_)</span>
+<span class="sd">		bobyqa, ralg, algencan, ipopt, mma, auglag and many others from the OpenOpt framework (via `openopt.NLP &lt;http://openopt.org/NLP&gt;`_)</span>
+<span class="sd">		minuit (via `PyMinuit &lt;https://code.google.com/p/pyminuit/&gt;`_)</span>
+<span class="sd">	&quot;&quot;&quot;</span>
+	<span class="kn">import</span> <span class="nn">scipy.optimize</span>
+	
+	<span class="n">n_params</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">parameter_names</span><span class="p">)</span>
+	
+	<span class="k">def</span> <span class="nf">minfunc</span><span class="p">(</span><span class="n">params</span><span class="p">):</span>
+		<span class="n">l</span> <span class="o">=</span> <span class="n">loglikelihood</span><span class="p">(</span><span class="n">params</span><span class="p">)</span>
+		<span class="n">p</span> <span class="o">=</span> <span class="n">prior</span><span class="p">(</span><span class="n">params</span><span class="p">)</span>
+		<span class="k">if</span> <span class="n">numpy</span><span class="o">.</span><span class="n">isinf</span><span class="p">(</span><span class="n">p</span><span class="p">)</span> <span class="ow">and</span> <span class="n">p</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">:</span>
+			<span class="k">print</span> <span class="s">&#39;    prior rejection&#39;</span>
+			<span class="k">return</span> <span class="o">-</span><span class="mf">1e300</span>
+		<span class="k">if</span> <span class="n">numpy</span><span class="o">.</span><span class="n">isnan</span><span class="p">(</span><span class="n">l</span><span class="p">):</span>
+			<span class="k">return</span> <span class="o">-</span><span class="mf">1e300</span>
+		<span class="k">return</span> <span class="o">-</span><span class="n">l</span> <span class="o">-</span> <span class="n">p</span>
+	<span class="k">def</span> <span class="nf">minfunc_cube</span><span class="p">(</span><span class="n">cube</span><span class="p">):</span>
+		<span class="n">cube</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">cube</span><span class="p">)</span>
+		<span class="k">if</span> <span class="p">(</span><span class="n">cube</span> <span class="o">&lt;=</span> <span class="mf">1e-10</span><span class="p">)</span><span class="o">.</span><span class="n">any</span><span class="p">()</span> <span class="ow">or</span> <span class="p">(</span><span class="n">cube</span> <span class="o">&gt;=</span> <span class="mi">1</span><span class="o">-</span><span class="mf">1e-10</span><span class="p">)</span><span class="o">.</span><span class="n">any</span><span class="p">():</span>
+			<span class="k">return</span> <span class="mf">1e100</span>
+		<span class="n">params</span> <span class="o">=</span> <span class="n">transform</span><span class="p">(</span><span class="n">cube</span><span class="p">)</span>
+		<span class="n">l</span> <span class="o">=</span> <span class="n">loglikelihood</span><span class="p">(</span><span class="n">params</span><span class="p">)</span>
+		<span class="n">p</span> <span class="o">=</span> <span class="n">prior</span><span class="p">(</span><span class="n">params</span><span class="p">)</span>
+		<span class="k">if</span> <span class="n">numpy</span><span class="o">.</span><span class="n">isinf</span><span class="p">(</span><span class="n">p</span><span class="p">)</span> <span class="ow">and</span> <span class="n">p</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">:</span>
+			<span class="k">print</span> <span class="s">&#39;    prior rejection&#39;</span>
+			<span class="k">return</span> <span class="o">-</span><span class="mf">1e300</span>
+		<span class="k">if</span> <span class="n">numpy</span><span class="o">.</span><span class="n">isnan</span><span class="p">(</span><span class="n">l</span><span class="p">):</span>
+			<span class="k">return</span> <span class="o">-</span><span class="mf">1e300</span>
+		<span class="k">return</span> <span class="o">-</span><span class="n">l</span> <span class="o">-</span> <span class="n">p</span>
+	
+	<span class="n">start</span> <span class="o">=</span> <span class="n">start</span> <span class="o">+</span> <span class="n">numpy</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">n_params</span><span class="p">)</span>
+	<span class="n">ret</span> <span class="o">=</span> <span class="p">{}</span>
+	<span class="k">if</span> <span class="n">method</span> <span class="o">==</span> <span class="s">&#39;neldermead&#39;</span><span class="p">:</span>
+		<span class="n">final</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="n">_niter</span><span class="p">,</span> <span class="n">neval</span><span class="p">,</span> <span class="n">warnflag</span> <span class="o">=</span> <span class="n">scipy</span><span class="o">.</span><span class="n">optimize</span><span class="o">.</span><span class="n">fmin</span><span class="p">(</span><span class="n">minfunc_cube</span><span class="p">,</span> <span class="n">start</span><span class="p">,</span> <span class="n">ftol</span><span class="o">=</span><span class="n">ftol</span><span class="p">,</span> <span class="n">disp</span><span class="o">=</span><span class="n">disp</span><span class="p">,</span> <span class="n">maxfun</span><span class="o">=</span><span class="n">nsteps</span><span class="p">,</span> <span class="n">full_output</span><span class="o">=</span><span class="bp">True</span><span class="p">)</span>
+	<span class="k">elif</span> <span class="n">method</span> <span class="o">==</span> <span class="s">&#39;cobyla&#39;</span><span class="p">:</span>
+		<span class="n">cons</span> <span class="o">=</span>  <span class="p">[</span><span class="k">lambda</span> <span class="n">params</span><span class="p">:</span> <span class="n">params</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>     <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n_params</span><span class="p">)]</span>
+		<span class="n">cons</span> <span class="o">+=</span> <span class="p">[</span><span class="k">lambda</span> <span class="n">params</span><span class="p">:</span> <span class="mi">1</span> <span class="o">-</span> <span class="n">params</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n_params</span><span class="p">)]</span>
+		<span class="n">final</span> <span class="o">=</span> <span class="n">scipy</span><span class="o">.</span><span class="n">optimize</span><span class="o">.</span><span class="n">fmin_cobyla</span><span class="p">(</span><span class="n">minfunc_cube</span><span class="p">,</span> <span class="n">start</span><span class="p">,</span> <span class="n">cons</span><span class="p">,</span> <span class="n">rhoend</span><span class="o">=</span><span class="n">ftol</span> <span class="o">/</span> <span class="mi">10</span><span class="p">,</span> <span class="n">disp</span><span class="o">=</span><span class="n">disp</span><span class="p">,</span> <span class="n">maxfun</span><span class="o">=</span><span class="n">nsteps</span><span class="p">)</span>
+		<span class="n">neval</span> <span class="o">=</span> <span class="n">nsteps</span>
+	<span class="k">elif</span> <span class="n">method</span> <span class="o">==</span> <span class="s">&#39;minuit&#39;</span> <span class="ow">or</span> <span class="n">method</span> <span class="o">==</span> <span class="s">&#39;hesse&#39;</span><span class="p">:</span>
+		<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">		We use eval here, and it is a dangerous thing to do.</span>
+<span class="sd">		But Minuit probes the objective function for parameter names,</span>
+<span class="sd">		and there is no way to create the objective function </span>
+<span class="sd">		dynamically with an unknown number of parameters other than</span>
+<span class="sd">		through eval.</span>
+<span class="sd">		&quot;&quot;&quot;</span>
+		<span class="n">s</span> <span class="o">=</span> <span class="s">&#39;, &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">parameter_names</span><span class="p">)</span>
+		<span class="n">s</span> <span class="o">=</span> <span class="s">&quot;&quot;&quot;lambda </span><span class="si">%s</span><span class="s">: minfunc([</span><span class="si">%s</span><span class="s">])&quot;&quot;&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">s</span><span class="p">,</span> <span class="n">s</span><span class="p">)</span>
+		<span class="k">if</span> <span class="n">method</span> <span class="o">==</span> <span class="s">&#39;hesse&#39;</span><span class="p">:</span>
+			<span class="n">f</span> <span class="o">=</span> <span class="nb">eval</span><span class="p">(</span><span class="n">s</span><span class="p">,</span> <span class="nb">dict</span><span class="p">(</span><span class="n">minfunc</span><span class="o">=</span><span class="n">minfunc</span><span class="p">,</span> <span class="n">numpy</span><span class="o">=</span><span class="n">numpy</span><span class="p">))</span>
+			<span class="n">start</span> <span class="o">=</span> <span class="n">transform</span><span class="p">(</span><span class="n">start</span><span class="p">)</span>
+		<span class="k">else</span><span class="p">:</span>
+			<span class="n">f</span> <span class="o">=</span> <span class="nb">eval</span><span class="p">(</span><span class="n">s</span><span class="p">,</span> <span class="nb">dict</span><span class="p">(</span><span class="n">minfunc</span><span class="o">=</span><span class="n">minfunc_cube</span><span class="p">,</span> <span class="n">numpy</span><span class="o">=</span><span class="n">numpy</span><span class="p">))</span>
+		<span class="kn">import</span> <span class="nn">minuit</span>
+		<span class="n">m</span> <span class="o">=</span> <span class="n">minuit</span><span class="o">.</span><span class="n">Minuit</span><span class="p">(</span><span class="n">f</span><span class="p">)</span>
+		<span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">p</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">parameter_names</span><span class="p">):</span>
+			<span class="n">m</span><span class="o">.</span><span class="n">values</span><span class="p">[</span><span class="n">p</span><span class="p">]</span> <span class="o">=</span> <span class="n">start</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
+			<span class="k">if</span> <span class="n">method</span> <span class="o">==</span> <span class="s">&#39;minuit&#39;</span><span class="p">:</span>
+				<span class="n">m</span><span class="o">.</span><span class="n">limits</span><span class="p">[</span><span class="n">p</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="mf">1e-10</span><span class="p">,</span> <span class="mi">1</span> <span class="o">-</span> <span class="mf">1e-10</span><span class="p">)</span>
+		<span class="n">m</span><span class="o">.</span><span class="n">up</span> <span class="o">=</span> <span class="mf">0.5</span>
+		<span class="n">m</span><span class="o">.</span><span class="n">tol</span> <span class="o">=</span> <span class="n">ftol</span> <span class="o">*</span> <span class="mi">100</span>
+		<span class="n">m</span><span class="o">.</span><span class="n">printMode</span> <span class="o">=</span> <span class="n">disp</span>
+		<span class="k">if</span> <span class="n">method</span> <span class="o">==</span> <span class="s">&#39;minuit&#39;</span><span class="p">:</span>
+			<span class="n">m</span><span class="o">.</span><span class="n">migrad</span><span class="p">()</span>
+		<span class="k">elif</span> <span class="n">method</span> <span class="o">==</span> <span class="s">&#39;hesse&#39;</span><span class="p">:</span>
+			<span class="n">m</span><span class="o">.</span><span class="n">hesse</span><span class="p">()</span>
+		<span class="n">final</span> <span class="o">=</span> <span class="p">[</span><span class="n">m</span><span class="o">.</span><span class="n">values</span><span class="p">[</span><span class="n">p</span><span class="p">]</span> <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">parameter_names</span><span class="p">]</span>
+		<span class="n">neval</span> <span class="o">=</span> <span class="n">m</span><span class="o">.</span><span class="n">ncalls</span>
+		<span class="n">errors</span> <span class="o">=</span> <span class="p">[</span><span class="n">m</span><span class="o">.</span><span class="n">errors</span><span class="p">[</span><span class="n">p</span><span class="p">]</span> <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">parameter_names</span><span class="p">]</span>
+
+		<span class="k">if</span> <span class="n">method</span> <span class="o">==</span> <span class="s">&#39;minuit&#39;</span><span class="p">:</span>
+			<span class="n">c0</span> <span class="o">=</span> <span class="n">final</span>
+			<span class="n">p0</span> <span class="o">=</span> <span class="n">transform</span><span class="p">(</span><span class="n">c0</span><span class="p">)</span>
+			<span class="n">stdev</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">n_params</span><span class="p">)</span>
+			<span class="n">lower</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">n_params</span><span class="p">)</span>
+			<span class="n">upper</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">n_params</span><span class="p">)</span>
+			<span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">w</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">errors</span><span class="p">):</span>
+				<span class="n">c1</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">copy</span><span class="p">(</span><span class="n">c0</span><span class="p">)</span>
+				<span class="n">c1</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">-=</span> <span class="n">w</span>
+				<span class="n">c2</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">copy</span><span class="p">(</span><span class="n">c0</span><span class="p">)</span>
+				<span class="n">c2</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">+=</span> <span class="n">w</span>
+				<span class="n">p1</span> <span class="o">=</span> <span class="n">transform</span><span class="p">(</span><span class="n">c1</span><span class="p">)</span>
+				<span class="n">p2</span> <span class="o">=</span> <span class="n">transform</span><span class="p">(</span><span class="n">c2</span><span class="p">)</span>
+				<span class="n">stdev</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">p2</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">-</span> <span class="n">p1</span><span class="p">[</span><span class="n">i</span><span class="p">])</span> <span class="o">/</span> <span class="mi">2</span>
+				<span class="n">lower</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">p2</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="n">p1</span><span class="p">[</span><span class="n">i</span><span class="p">])</span>
+				<span class="n">upper</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">p2</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="n">p1</span><span class="p">[</span><span class="n">i</span><span class="p">])</span>
+			<span class="n">ret</span><span class="p">[</span><span class="s">&#39;stdev&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">stdev</span>
+			<span class="n">ret</span><span class="p">[</span><span class="s">&#39;upper&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">upper</span>
+			<span class="n">ret</span><span class="p">[</span><span class="s">&#39;lower&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">lower</span>
+		<span class="k">elif</span> <span class="n">method</span> <span class="o">==</span> <span class="s">&#39;hesse&#39;</span><span class="p">:</span>
+			<span class="n">ret</span><span class="p">[</span><span class="s">&#39;stdev&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">errors</span>
+			<span class="n">ret</span><span class="p">[</span><span class="s">&#39;cov&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">matrix</span><span class="p">([[</span><span class="n">m</span><span class="o">.</span><span class="n">covariance</span><span class="p">[(</span><span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">)]</span> <span class="k">for</span> <span class="n">b</span> <span class="ow">in</span> <span class="n">parameter_names</span><span class="p">]</span> <span class="k">for</span> <span class="n">a</span> <span class="ow">in</span> <span class="n">parameter_names</span><span class="p">])</span>
+			
+	<span class="k">else</span><span class="p">:</span>
+		<span class="kn">from</span> <span class="nn">openopt</span> <span class="kn">import</span> <span class="n">NLP</span>
+		<span class="n">lo</span> <span class="o">=</span> <span class="p">[</span><span class="mf">1e-10</span><span class="p">]</span> <span class="o">*</span> <span class="n">n_params</span>
+		<span class="n">hi</span> <span class="o">=</span> <span class="p">[</span><span class="mi">1</span><span class="o">-</span><span class="mf">1e-10</span><span class="p">]</span> <span class="o">*</span> <span class="n">n_params</span>
+		<span class="n">iprint</span> <span class="o">=</span> <span class="mi">0</span> <span class="k">if</span> <span class="n">disp</span> <span class="o">==</span> <span class="mi">0</span> <span class="k">else</span> <span class="mi">10</span> <span class="k">if</span> <span class="n">disp</span> <span class="o">==</span> <span class="mi">1</span> <span class="k">else</span> <span class="mi">1</span>
+		<span class="n">p</span> <span class="o">=</span> <span class="n">NLP</span><span class="p">(</span><span class="n">f</span><span class="o">=</span><span class="n">minfunc_cube</span><span class="p">,</span> <span class="n">x0</span><span class="o">=</span><span class="n">start</span><span class="p">,</span> <span class="n">lb</span><span class="o">=</span><span class="n">lo</span><span class="p">,</span> <span class="n">ub</span><span class="o">=</span><span class="n">hi</span><span class="p">,</span>
+			<span class="n">maxFunEvals</span><span class="o">=</span><span class="n">nsteps</span><span class="p">,</span> <span class="n">ftol</span><span class="o">=</span><span class="n">ftol</span><span class="p">,</span> <span class="n">iprint</span><span class="o">=</span><span class="n">iprint</span><span class="p">)</span>
+		<span class="n">r</span> <span class="o">=</span> <span class="n">p</span><span class="o">.</span><span class="n">solve</span><span class="p">(</span><span class="n">method</span><span class="p">)</span>
+		<span class="n">final</span> <span class="o">=</span> <span class="n">r</span><span class="o">.</span><span class="n">xf</span>
+		<span class="n">neval</span> <span class="o">=</span> <span class="n">r</span><span class="o">.</span><span class="n">evals</span><span class="p">[</span><span class="s">&#39;f&#39;</span><span class="p">]</span>
+	
+	<span class="n">ret</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="nb">dict</span><span class="p">(</span><span class="n">start</span><span class="o">=</span><span class="n">final</span><span class="p">,</span> <span class="n">maximum</span><span class="o">=</span><span class="n">transform</span><span class="p">(</span><span class="n">final</span><span class="p">),</span> <span class="n">method</span><span class="o">=</span><span class="n">method</span><span class="p">,</span> <span class="n">neval</span><span class="o">=</span><span class="n">neval</span><span class="p">))</span>
+	<span class="k">return</span> <span class="n">ret</span>
+
+</div>
+<div class="viewcode-block" id="onebyone"><a class="viewcode-back" href="../../doc.html#jbopt.classic.onebyone">[docs]</a><span class="k">def</span> <span class="nf">onebyone</span><span class="p">(</span><span class="n">transform</span><span class="p">,</span> <span class="n">loglikelihood</span><span class="p">,</span> <span class="n">parameter_names</span><span class="p">,</span> <span class="n">start</span> <span class="o">=</span> <span class="mf">0.5</span><span class="p">,</span> <span class="n">ftol</span><span class="o">=</span><span class="mf">0.1</span><span class="p">,</span> <span class="n">disp</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">nsteps</span><span class="o">=</span><span class="mi">40000</span><span class="p">,</span>
+	<span class="n">parallel</span><span class="o">=</span><span class="bp">False</span><span class="p">,</span> <span class="n">find_uncertainties</span><span class="o">=</span><span class="bp">False</span><span class="p">,</span> <span class="o">**</span><span class="n">args</span><span class="p">):</span>
+	<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">	Convex optimization based on Brent&#39;s method</span>
+<span class="sd">	--------------------------------------------------</span>
+<span class="sd">	</span>
+<span class="sd">	A strict assumption of one optimum between the parameter limits is used.</span>
+<span class="sd">	The bounds are narrowed until it is found, i.e. the likelihood function is flat</span>
+<span class="sd">	within the bounds.</span>
+<span class="sd">	* If optimum outside bracket, expands bracket until contained.</span>
+<span class="sd">	* Thus guaranteed to return local optimum.</span>
+<span class="sd">	* Supports parallelization (multiple parameters are treated independently)</span>
+<span class="sd">	* Supports finding ML uncertainties (Delta-Chi^2=1)</span>
+
+<span class="sd">	Very useful for 1-3d problems.</span>
+<span class="sd">	Otherwise useful, reproducible/deterministic algorithm for finding the minimum in </span>
+<span class="sd">	well-behaved likelihoods, where the parameters are weakly independent,</span>
+<span class="sd">	or to find a good starting point. </span>
+<span class="sd">	Optimizes each parameter in order, assuming they are largely independent.</span>
+<span class="sd">	</span>
+<span class="sd">	For 1-dimensional algorithm used, see :ref:`optimize`</span>
+<span class="sd">	</span>
+<span class="sd">	@ftol: </span>
+<span class="sd">		difference in values at which the function can be considered flat</span>
+<span class="sd">	@compute_errors:</span>
+<span class="sd">	 	compute standard deviation of gaussian around optimum</span>
+<span class="sd">	&quot;&quot;&quot;</span>
+	
+	<span class="k">def</span> <span class="nf">minfunc</span><span class="p">(</span><span class="n">cube</span><span class="p">):</span>
+		<span class="n">cube</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">cube</span><span class="p">)</span>
+		<span class="k">if</span> <span class="p">(</span><span class="n">cube</span> <span class="o">&lt;=</span> <span class="mf">1e-10</span><span class="p">)</span><span class="o">.</span><span class="n">any</span><span class="p">()</span> <span class="ow">or</span> <span class="p">(</span><span class="n">cube</span> <span class="o">&gt;=</span> <span class="mi">1</span><span class="o">-</span><span class="mf">1e-10</span><span class="p">)</span><span class="o">.</span><span class="n">any</span><span class="p">():</span>
+			<span class="k">return</span> <span class="mf">1e100</span>
+		<span class="n">params</span> <span class="o">=</span> <span class="n">transform</span><span class="p">(</span><span class="n">cube</span><span class="p">)</span>
+		<span class="n">l</span> <span class="o">=</span> <span class="n">loglikelihood</span><span class="p">(</span><span class="n">params</span><span class="p">)</span>
+		<span class="n">p</span> <span class="o">=</span> <span class="n">prior</span><span class="p">(</span><span class="n">params</span><span class="p">)</span>
+		<span class="k">if</span> <span class="n">numpy</span><span class="o">.</span><span class="n">isinf</span><span class="p">(</span><span class="n">p</span><span class="p">)</span> <span class="ow">and</span> <span class="n">p</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">:</span>
+			<span class="k">print</span> <span class="s">&#39;    prior rejection&#39;</span>
+			<span class="k">return</span> <span class="o">-</span><span class="mf">1e300</span>
+		<span class="k">if</span> <span class="n">numpy</span><span class="o">.</span><span class="n">isnan</span><span class="p">(</span><span class="n">l</span><span class="p">):</span>
+			<span class="k">return</span> <span class="o">-</span><span class="mf">1e300</span>
+		<span class="k">return</span> <span class="o">-</span><span class="n">l</span> <span class="o">-</span> <span class="n">p</span>
+	
+	<span class="k">if</span> <span class="n">parallel</span><span class="p">:</span>
+		<span class="n">func</span> <span class="o">=</span> <span class="n">opt_grid_parallel</span>
+	<span class="k">else</span><span class="p">:</span>
+		<span class="n">func</span> <span class="o">=</span> <span class="n">opt_grid</span>
+	
+	<span class="n">n_params</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">parameter_names</span><span class="p">)</span>
+	<span class="n">start</span> <span class="o">=</span> <span class="n">start</span> <span class="o">+</span> <span class="n">numpy</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">n_params</span><span class="p">)</span>
+	<span class="n">ret</span> <span class="o">=</span> <span class="n">func</span><span class="p">(</span><span class="n">start</span><span class="p">,</span> <span class="n">minfunc</span><span class="p">,</span> <span class="p">[(</span><span class="mf">1e-10</span><span class="p">,</span> <span class="mi">1</span><span class="o">-</span><span class="mf">1e-10</span><span class="p">)]</span> <span class="o">*</span> <span class="n">n_params</span><span class="p">,</span> <span class="n">ftol</span><span class="o">=</span><span class="n">ftol</span><span class="p">,</span> <span class="n">disp</span><span class="o">=</span><span class="n">disp</span><span class="p">,</span> <span class="n">compute_errors</span><span class="o">=</span><span class="n">find_uncertainties</span><span class="p">)</span>
+	
+	<span class="k">if</span> <span class="n">find_uncertainties</span><span class="p">:</span>
+		<span class="n">c0</span> <span class="o">=</span> <span class="n">ret</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+		<span class="n">p0</span> <span class="o">=</span> <span class="n">transform</span><span class="p">(</span><span class="n">c0</span><span class="p">)</span>
+		<span class="n">stdev</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">n_params</span><span class="p">)</span>
+		<span class="n">lower</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">n_params</span><span class="p">)</span>
+		<span class="n">upper</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">n_params</span><span class="p">)</span>
+		<span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="p">(</span><span class="n">lo</span><span class="p">,</span> <span class="n">hi</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">ret</span><span class="p">[</span><span class="mi">1</span><span class="p">]):</span>
+			<span class="n">c1</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">copy</span><span class="p">(</span><span class="n">c0</span><span class="p">)</span>
+			<span class="n">c1</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">lo</span>
+			<span class="n">c2</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">copy</span><span class="p">(</span><span class="n">c0</span><span class="p">)</span>
+			<span class="n">c2</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">hi</span>
+			<span class="n">p1</span> <span class="o">=</span> <span class="n">transform</span><span class="p">(</span><span class="n">c1</span><span class="p">)</span>
+			<span class="n">p2</span> <span class="o">=</span> <span class="n">transform</span><span class="p">(</span><span class="n">c2</span><span class="p">)</span>
+			<span class="n">stdev</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">p2</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">-</span> <span class="n">p1</span><span class="p">[</span><span class="n">i</span><span class="p">])</span> <span class="o">/</span> <span class="mi">2</span>
+			<span class="n">lower</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">p2</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="n">p1</span><span class="p">[</span><span class="n">i</span><span class="p">])</span>
+			<span class="n">upper</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">p2</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="n">p1</span><span class="p">[</span><span class="n">i</span><span class="p">])</span>
+		<span class="k">return</span> <span class="nb">dict</span><span class="p">(</span><span class="n">start</span><span class="o">=</span><span class="n">ret</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">maximum</span><span class="o">=</span><span class="n">p0</span><span class="p">,</span>
+			<span class="n">stdev</span><span class="o">=</span><span class="n">stdev</span><span class="p">,</span> <span class="n">upper</span><span class="o">=</span><span class="n">upper</span><span class="p">,</span> <span class="n">lower</span><span class="o">=</span><span class="n">lower</span><span class="p">,</span>
+			<span class="n">method</span><span class="o">=</span><span class="s">&#39;opt_grid&#39;</span><span class="p">)</span>
+	<span class="k">else</span><span class="p">:</span>
+		<span class="k">return</span> <span class="nb">dict</span><span class="p">(</span><span class="n">start</span><span class="o">=</span><span class="n">ret</span><span class="p">,</span> <span class="n">maximum</span><span class="o">=</span><span class="n">transform</span><span class="p">(</span><span class="n">ret</span><span class="p">),</span> <span class="n">method</span><span class="o">=</span><span class="s">&#39;opt_grid&#39;</span><span class="p">)</span>
+</pre></div></div>
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li><a href="../../index.html">jbopt 0.1 documentation</a> &raquo;</li>
+          <li><a href="../index.html" >Module code</a> &raquo;</li>
+          <li><a href="../jbopt.html" >jbopt</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright 2013, Johannes Buchner.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.1.3.
+    </div>
+  </body>
+</html>

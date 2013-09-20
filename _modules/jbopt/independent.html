@@ -1,0 +1,304 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>jbopt.independent &mdash; jbopt 0.1 documentation</title>
+    
+    <link rel="stylesheet" href="../../_static/nature.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../',
+        VERSION:     '0.1',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../_static/doctools.js"></script>
+    <link rel="top" title="jbopt 0.1 documentation" href="../../index.html" />
+    <link rel="up" title="jbopt" href="../jbopt.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li><a href="../../index.html">jbopt 0.1 documentation</a> &raquo;</li>
+          <li><a href="../index.html" >Module code</a> &raquo;</li>
+          <li><a href="../jbopt.html" accesskey="U">jbopt</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <h1>Source code for jbopt.independent</h1><div class="highlight"><pre>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Custom minimization algorithms in jbopt</span>
+
+<span class="sd">minimization routines that assume the parameters to be mostly independent from </span>
+<span class="sd">each other, optimizing each parameter in turn.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">import</span> <span class="nn">numpy</span>
+
+<div class="viewcode-block" id="opt_normalizations"><a class="viewcode-back" href="../../doc.html#jbopt.independent.opt_normalizations">[docs]</a><span class="k">def</span> <span class="nf">opt_normalizations</span><span class="p">(</span><span class="n">params</span><span class="p">,</span> <span class="n">func</span><span class="p">,</span> <span class="n">limits</span><span class="p">,</span> <span class="n">abandon_threshold</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span> <span class="n">noimprovement_threshold</span><span class="o">=</span><span class="mf">1e-3</span><span class="p">,</span>
+	<span class="n">disp</span><span class="o">=</span><span class="mi">0</span><span class="p">):</span>
+	<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">	**optimization algorithm for scale variables (positive value of unknown magnitude)**</span>
+<span class="sd">	</span>
+<span class="sd">	Each parameter is a normalization of a feature, and its value is sought.</span>
+<span class="sd">	The parameters are handled in order (assumed to be independent), </span>
+<span class="sd">	but a second round can be run.</span>
+<span class="sd">	Various magnitudes of the normalization are tried. If the normalization converges</span>
+<span class="sd">	to zero, the largest value yielding a comparable value is used.</span>
+
+<span class="sd">	Optimizes each normalization parameter in rough steps </span>
+<span class="sd">	using multiples of 3 of start point</span>
+<span class="sd">	to find reasonable starting values for another algorithm.</span>
+<span class="sd">	</span>
+<span class="sd">	parameters, minimization function, parameter space definition [(lo, hi) for i in params]</span>
+<span class="sd">	</span>
+<span class="sd">	:param abandon_threshold:</span>
+<span class="sd">		if in one direction the function increases by this much over the best value, </span>
+<span class="sd">		abort search in this direction</span>
+<span class="sd">	:param noimprovement_threshold:</span>
+<span class="sd">		when decreasing the normalization, if the function increases by less than </span>
+<span class="sd">		this amount, abort search in this direction</span>
+<span class="sd">	:param disp:</span>
+<span class="sd">		verbosity</span>
+<span class="sd">	&quot;&quot;&quot;</span>
+	<span class="n">newparams</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">copy</span><span class="p">(</span><span class="n">params</span><span class="p">)</span>
+	<span class="n">lower</span> <span class="o">=</span> <span class="p">[</span><span class="n">lo</span> <span class="k">for</span> <span class="n">lo</span><span class="p">,</span> <span class="n">hi</span> <span class="ow">in</span> <span class="n">limits</span><span class="p">]</span>
+	<span class="n">upper</span> <span class="o">=</span> <span class="p">[</span><span class="n">hi</span> <span class="k">for</span> <span class="n">lo</span><span class="p">,</span> <span class="n">hi</span> <span class="ow">in</span> <span class="n">limits</span><span class="p">]</span>
+	<span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">p</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">params</span><span class="p">):</span>
+		<span class="n">startval</span> <span class="o">=</span> <span class="n">p</span>
+		<span class="n">beststat</span> <span class="o">=</span> <span class="n">func</span><span class="p">(</span><span class="n">newparams</span><span class="p">)</span>
+		<span class="n">bestval</span> <span class="o">=</span> <span class="n">startval</span>
+		<span class="k">if</span> <span class="n">disp</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span> <span class="k">print</span> <span class="s">&#39;</span><span class="se">\t\t</span><span class="s">start val = </span><span class="si">%e</span><span class="s">: </span><span class="si">%e</span><span class="s">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">startval</span><span class="p">,</span> <span class="n">beststat</span><span class="p">)</span>
+		<span class="n">go_up</span> <span class="o">=</span> <span class="bp">True</span>
+		<span class="n">go_down</span> <span class="o">=</span> <span class="bp">True</span>
+		<span class="c"># go up and down in multiples of 3</span>
+		<span class="c"># once that is done, refine in multiples of 1.1</span>
+		<span class="k">for</span> <span class="n">n</span> <span class="ow">in</span> <span class="nb">list</span><span class="p">(</span><span class="mf">3.</span><span class="o">**</span><span class="n">numpy</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">20</span><span class="p">))</span> <span class="o">+</span> <span class="p">[</span><span class="bp">None</span><span class="p">]</span> <span class="o">+</span> <span class="nb">list</span><span class="p">(</span><span class="mf">1.1</span><span class="o">**</span><span class="n">numpy</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">13</span><span class="p">)):</span>
+			<span class="k">if</span> <span class="n">n</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
+				<span class="n">startval</span> <span class="o">=</span> <span class="n">bestval</span>
+				<span class="k">if</span> <span class="n">disp</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span> <span class="k">print</span> <span class="s">&#39;</span><span class="se">\t\t</span><span class="s">refining from </span><span class="si">%e</span><span class="s">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">startval</span><span class="p">)</span>
+				<span class="n">go_up</span> <span class="o">=</span> <span class="bp">True</span>
+				<span class="n">go_down</span> <span class="o">=</span> <span class="bp">True</span>
+				<span class="k">continue</span>
+			<span class="k">if</span> <span class="n">go_up</span> <span class="ow">and</span> <span class="n">startval</span> <span class="o">*</span> <span class="n">n</span> <span class="o">&gt;</span> <span class="n">upper</span><span class="p">[</span><span class="n">i</span><span class="p">]:</span>
+				<span class="k">if</span> <span class="n">disp</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span> <span class="k">print</span> <span class="s">&#39;</span><span class="se">\t\t</span><span class="s">hit upper border (</span><span class="si">%e</span><span class="s"> * </span><span class="si">%e</span><span class="s"> &gt; </span><span class="si">%e</span><span class="s">)&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">startval</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="n">upper</span><span class="p">[</span><span class="n">i</span><span class="p">])</span>
+				<span class="n">go_up</span> <span class="o">=</span> <span class="bp">False</span>
+			<span class="k">if</span> <span class="n">go_down</span> <span class="ow">and</span> <span class="n">startval</span> <span class="o">/</span> <span class="n">n</span> <span class="o">&lt;</span> <span class="n">lower</span><span class="p">[</span><span class="n">i</span><span class="p">]:</span>
+				<span class="k">if</span> <span class="n">disp</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span> <span class="k">print</span> <span class="s">&#39;</span><span class="se">\t\t</span><span class="s">hit lower border (</span><span class="si">%e</span><span class="s"> / </span><span class="si">%e</span><span class="s"> &gt; </span><span class="si">%e</span><span class="s">)&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">startval</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="n">lower</span><span class="p">[</span><span class="n">i</span><span class="p">])</span>
+				<span class="n">go_down</span> <span class="o">=</span> <span class="bp">False</span>
+			<span class="k">if</span> <span class="n">go_up</span><span class="p">:</span>
+				<span class="k">if</span> <span class="n">disp</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span> <span class="k">print</span> <span class="s">&#39;</span><span class="se">\t\t</span><span class="s">trying </span><span class="si">%e</span><span class="s"> ^&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">startval</span> <span class="o">*</span> <span class="n">n</span><span class="p">)</span>
+				<span class="n">newparams</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">startval</span> <span class="o">*</span> <span class="n">n</span>
+				<span class="n">newstat</span> <span class="o">=</span> <span class="n">func</span><span class="p">(</span><span class="n">newparams</span><span class="p">)</span>
+				<span class="k">if</span> <span class="n">disp</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span> <span class="k">print</span> <span class="s">&#39;</span><span class="se">\t\t</span><span class="s">val = </span><span class="si">%e</span><span class="s">: </span><span class="si">%e</span><span class="s">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">newparams</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="n">newstat</span><span class="p">)</span>
+				<span class="k">if</span> <span class="n">newstat</span> <span class="o">&lt;=</span> <span class="n">beststat</span><span class="p">:</span>
+					<span class="n">bestval</span> <span class="o">=</span> <span class="n">newparams</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
+					<span class="n">beststat</span> <span class="o">=</span> <span class="n">newstat</span>
+					<span class="k">if</span> <span class="n">disp</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span> <span class="k">print</span> <span class="s">&#39;</span><span class="se">\t\t\t</span><span class="s">improvement: </span><span class="si">%e</span><span class="s">&#39;</span> <span class="o">%</span> <span class="n">newparams</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
+				<span class="k">if</span> <span class="n">newstat</span> <span class="o">&gt;</span> <span class="n">beststat</span> <span class="o">+</span> <span class="n">abandon_threshold</span><span class="p">:</span>
+					<span class="n">go_up</span> <span class="o">=</span> <span class="bp">False</span>
+			<span class="k">if</span> <span class="n">go_down</span><span class="p">:</span>
+				<span class="k">if</span> <span class="n">disp</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span> <span class="k">print</span> <span class="s">&#39;</span><span class="se">\t\t</span><span class="s">trying </span><span class="si">%e</span><span class="s"> v&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">startval</span> <span class="o">/</span> <span class="n">n</span><span class="p">)</span>
+				<span class="n">newparams</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">startval</span> <span class="o">/</span> <span class="n">n</span>
+				<span class="n">newstat</span> <span class="o">=</span> <span class="n">func</span><span class="p">(</span><span class="n">newparams</span><span class="p">)</span>
+				<span class="k">if</span> <span class="n">disp</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span> <span class="k">print</span> <span class="s">&#39;</span><span class="se">\t\t</span><span class="s">val = </span><span class="si">%e</span><span class="s">: </span><span class="si">%e</span><span class="s">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">newparams</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="n">newstat</span><span class="p">)</span>
+				<span class="k">if</span> <span class="n">newstat</span> <span class="o">+</span> <span class="n">noimprovement_threshold</span> <span class="o">&lt;</span> <span class="n">beststat</span><span class="p">:</span> <span class="c"># avoid zeros in normalizations</span>
+					<span class="n">bestval</span> <span class="o">=</span> <span class="n">newparams</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
+					<span class="n">beststat</span> <span class="o">=</span> <span class="n">newstat</span>
+					<span class="k">if</span> <span class="n">disp</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span> <span class="k">print</span> <span class="s">&#39;</span><span class="se">\t\t\t</span><span class="s">improvement: </span><span class="si">%e</span><span class="s">&#39;</span> <span class="o">%</span> <span class="n">newparams</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
+				<span class="k">if</span> <span class="n">newstat</span> <span class="o">&gt;</span> <span class="n">beststat</span> <span class="o">+</span> <span class="n">abandon_threshold</span><span class="p">:</span>
+					<span class="n">go_down</span> <span class="o">=</span> <span class="bp">False</span>
+		<span class="n">newparams</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">bestval</span>
+		<span class="k">print</span> <span class="s">&#39;</span><span class="se">\t</span><span class="s">new normalization of </span><span class="si">%d</span><span class="s">: </span><span class="si">%e</span><span class="s">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">newparams</span><span class="p">[</span><span class="n">i</span><span class="p">])</span>
+	<span class="k">print</span> <span class="s">&#39;optimization done, reached </span><span class="si">%.3f</span><span class="s">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">beststat</span><span class="p">)</span>
+	<span class="k">return</span> <span class="n">newparams</span>
+</div>
+<span class="kn">from</span> <span class="nn">optimize1d</span> <span class="kn">import</span> <span class="o">*</span>
+
+<div class="viewcode-block" id="opt_grid"><a class="viewcode-back" href="../../doc.html#jbopt.independent.opt_grid">[docs]</a><span class="k">def</span> <span class="nf">opt_grid</span><span class="p">(</span><span class="n">params</span><span class="p">,</span> <span class="n">func</span><span class="p">,</span> <span class="n">limits</span><span class="p">,</span> <span class="n">ftol</span><span class="o">=</span><span class="mf">0.01</span><span class="p">,</span> <span class="n">disp</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">compute_errors</span><span class="o">=</span><span class="bp">True</span><span class="p">):</span>
+	<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">	see :func:`optimize1d.optimize`, considers each parameter in order</span>
+<span class="sd">	</span>
+<span class="sd">	:param ftol: </span>
+<span class="sd">		difference in values at which the function can be considered flat</span>
+<span class="sd">	:param compute_errors:</span>
+<span class="sd">	 	compute standard deviation of gaussian around optimum</span>
+<span class="sd">	&quot;&quot;&quot;</span>
+	<span class="n">caches</span> <span class="o">=</span> <span class="p">[[]</span> <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">params</span><span class="p">]</span>
+	<span class="n">newparams</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">copy</span><span class="p">(</span><span class="n">params</span><span class="p">)</span>
+	<span class="n">errors</span> <span class="o">=</span> <span class="p">[[]</span> <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">params</span><span class="p">]</span>
+	<span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">p</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">params</span><span class="p">):</span>
+		<span class="n">cache</span> <span class="o">=</span> <span class="p">[]</span>
+		<span class="k">def</span> <span class="nf">func1</span><span class="p">(</span><span class="n">x0</span><span class="p">):</span>
+			<span class="n">newparams</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">x0</span>
+			<span class="n">v</span> <span class="o">=</span> <span class="n">func</span><span class="p">(</span><span class="n">newparams</span><span class="p">)</span>
+			<span class="n">cache</span><span class="o">.</span><span class="n">append</span><span class="p">([</span><span class="n">x0</span><span class="p">,</span> <span class="n">v</span><span class="p">])</span>
+			<span class="k">return</span> <span class="n">v</span>
+		<span class="n">lo</span><span class="p">,</span> <span class="n">hi</span> <span class="o">=</span> <span class="n">limits</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
+		<span class="n">bestval</span> <span class="o">=</span> <span class="n">optimize</span><span class="p">(</span><span class="n">func1</span><span class="p">,</span> <span class="n">x0</span><span class="o">=</span><span class="n">p</span><span class="p">,</span>
+			<span class="n">cons</span><span class="o">=</span><span class="p">[</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">x</span> <span class="o">-</span> <span class="n">lo</span><span class="p">,</span> <span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">hi</span> <span class="o">-</span> <span class="n">x</span><span class="p">],</span> 
+			<span class="n">ftol</span><span class="o">=</span><span class="n">ftol</span><span class="p">,</span> <span class="n">disp</span><span class="o">=</span><span class="n">disp</span><span class="p">)</span>
+		
+		<span class="k">if</span> <span class="n">compute_errors</span><span class="p">:</span>
+			<span class="n">errors</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">cache2errors</span><span class="p">(</span><span class="n">func1</span><span class="p">,</span> <span class="n">cache</span><span class="p">,</span> <span class="n">disp</span><span class="o">=</span><span class="n">disp</span><span class="p">)</span>
+		
+		<span class="n">newparams</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">bestval</span>
+		<span class="n">caches</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">cache</span>
+		<span class="k">if</span> <span class="n">compute_errors</span><span class="p">:</span>
+			<span class="k">print</span> <span class="s">&#39;</span><span class="se">\t</span><span class="s">new value of </span><span class="si">%d</span><span class="s">: </span><span class="si">%e</span><span class="s"> [</span><span class="si">%e</span><span class="s"> .. </span><span class="si">%e</span><span class="s">]&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">bestval</span><span class="p">,</span> <span class="n">errors</span><span class="p">[</span><span class="n">i</span><span class="p">][</span><span class="mi">0</span><span class="p">],</span> <span class="n">errors</span><span class="p">[</span><span class="n">i</span><span class="p">][</span><span class="mi">1</span><span class="p">])</span>
+		<span class="k">else</span><span class="p">:</span>
+			<span class="k">print</span> <span class="s">&#39;</span><span class="se">\t</span><span class="s">new value of </span><span class="si">%d</span><span class="s">: </span><span class="si">%e</span><span class="s">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">bestval</span><span class="p">)</span>
+	<span class="n">beststat</span> <span class="o">=</span> <span class="n">func</span><span class="p">(</span><span class="n">newparams</span><span class="p">)</span>
+	<span class="k">print</span> <span class="s">&#39;optimization done, reached </span><span class="si">%.3f</span><span class="s">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">beststat</span><span class="p">)</span>
+	
+	<span class="k">if</span> <span class="n">compute_errors</span><span class="p">:</span>
+		<span class="k">return</span> <span class="n">newparams</span><span class="p">,</span> <span class="n">errors</span>
+	<span class="k">else</span><span class="p">:</span>
+		<span class="k">return</span> <span class="n">newparams</span>
+</div>
+<div class="viewcode-block" id="opt_grid_parallel"><a class="viewcode-back" href="../../doc.html#jbopt.independent.opt_grid_parallel">[docs]</a><span class="k">def</span> <span class="nf">opt_grid_parallel</span><span class="p">(</span><span class="n">params</span><span class="p">,</span> <span class="n">func</span><span class="p">,</span> <span class="n">limits</span><span class="p">,</span> <span class="n">ftol</span><span class="o">=</span><span class="mf">0.01</span><span class="p">,</span> <span class="n">disp</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">compute_errors</span><span class="o">=</span><span class="bp">True</span><span class="p">):</span>
+	<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">	parallelized version of :func:`opt_grid`</span>
+<span class="sd">	&quot;&quot;&quot;</span>
+
+	<span class="kn">import</span> <span class="nn">multiprocessing</span>
+
+	<span class="k">def</span> <span class="nf">spawn</span><span class="p">(</span><span class="n">f</span><span class="p">):</span>
+	    <span class="k">def</span> <span class="nf">fun</span><span class="p">(</span><span class="n">q_in</span><span class="p">,</span><span class="n">q_out</span><span class="p">):</span>
+		<span class="k">while</span> <span class="bp">True</span><span class="p">:</span>
+		    <span class="n">i</span><span class="p">,</span><span class="n">x</span> <span class="o">=</span> <span class="n">q_in</span><span class="o">.</span><span class="n">get</span><span class="p">()</span>
+		    <span class="k">if</span> <span class="n">i</span> <span class="o">==</span> <span class="bp">None</span><span class="p">:</span>
+		        <span class="k">break</span>
+		    <span class="n">q_out</span><span class="o">.</span><span class="n">put</span><span class="p">((</span><span class="n">i</span><span class="p">,</span><span class="n">f</span><span class="p">(</span><span class="n">x</span><span class="p">)))</span>
+	    <span class="k">return</span> <span class="n">fun</span>
+
+	<span class="k">def</span> <span class="nf">parmap</span><span class="p">(</span><span class="n">f</span><span class="p">,</span> <span class="n">X</span><span class="p">,</span> <span class="n">nprocs</span> <span class="o">=</span> <span class="n">multiprocessing</span><span class="o">.</span><span class="n">cpu_count</span><span class="p">()):</span>
+	    <span class="n">q_in</span>   <span class="o">=</span> <span class="n">multiprocessing</span><span class="o">.</span><span class="n">Queue</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+	    <span class="n">q_out</span>  <span class="o">=</span> <span class="n">multiprocessing</span><span class="o">.</span><span class="n">Queue</span><span class="p">()</span>
+
+	    <span class="n">proc</span> <span class="o">=</span> <span class="p">[</span><span class="n">multiprocessing</span><span class="o">.</span><span class="n">Process</span><span class="p">(</span><span class="n">target</span><span class="o">=</span><span class="n">spawn</span><span class="p">(</span><span class="n">f</span><span class="p">),</span><span class="n">args</span><span class="o">=</span><span class="p">(</span><span class="n">q_in</span><span class="p">,</span><span class="n">q_out</span><span class="p">))</span> <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">nprocs</span><span class="p">)]</span>
+	    <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">proc</span><span class="p">:</span>
+		<span class="n">p</span><span class="o">.</span><span class="n">daemon</span> <span class="o">=</span> <span class="bp">True</span>
+		<span class="n">p</span><span class="o">.</span><span class="n">start</span><span class="p">()</span>
+
+	    <span class="n">sent</span> <span class="o">=</span> <span class="p">[</span><span class="n">q_in</span><span class="o">.</span><span class="n">put</span><span class="p">((</span><span class="n">i</span><span class="p">,</span><span class="n">x</span><span class="p">))</span> <span class="k">for</span> <span class="n">i</span><span class="p">,</span><span class="n">x</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">X</span><span class="p">)]</span>
+	    <span class="p">[</span><span class="n">q_in</span><span class="o">.</span><span class="n">put</span><span class="p">((</span><span class="bp">None</span><span class="p">,</span><span class="bp">None</span><span class="p">))</span> <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">nprocs</span><span class="p">)]</span>
+	    <span class="n">res</span> <span class="o">=</span> <span class="p">[</span><span class="n">q_out</span><span class="o">.</span><span class="n">get</span><span class="p">()</span> <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">sent</span><span class="p">))]</span>
+
+	    <span class="p">[</span><span class="n">p</span><span class="o">.</span><span class="n">join</span><span class="p">()</span> <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">proc</span><span class="p">]</span>
+
+	    <span class="k">return</span> <span class="p">[</span><span class="n">x</span> <span class="k">for</span> <span class="n">i</span><span class="p">,</span><span class="n">x</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">res</span><span class="p">)]</span>
+	
+	<span class="n">nthreads</span> <span class="o">=</span> <span class="n">multiprocessing</span><span class="o">.</span><span class="n">cpu_count</span><span class="p">()</span>
+	
+	<span class="n">caches</span> <span class="o">=</span> <span class="p">[[]</span> <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">params</span><span class="p">]</span>
+	<span class="n">newparams</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">copy</span><span class="p">(</span><span class="n">params</span><span class="p">)</span>
+	<span class="n">errors</span> <span class="o">=</span> <span class="p">[[]</span> <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">params</span><span class="p">]</span>
+	<span class="n">indices</span> <span class="o">=</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">params</span><span class="p">),</span> <span class="n">nthreads</span><span class="p">)</span>
+	<span class="n">k</span> <span class="o">=</span> <span class="mi">0</span>
+	<span class="k">while</span> <span class="n">k</span> <span class="o">&lt;</span> <span class="nb">len</span><span class="p">(</span><span class="n">params</span><span class="p">):</span>
+		<span class="n">j</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">params</span><span class="p">),</span> <span class="n">k</span> <span class="o">+</span> <span class="n">nthreads</span><span class="p">)</span>
+		<span class="k">def</span> <span class="nf">run1d</span><span class="p">((</span><span class="n">i</span><span class="p">,</span> <span class="n">curparams</span><span class="p">,</span> <span class="n">curlimits</span><span class="p">)):</span>
+			<span class="n">cache</span> <span class="o">=</span> <span class="p">[]</span>
+			<span class="k">def</span> <span class="nf">func1</span><span class="p">(</span><span class="n">x0</span><span class="p">):</span>
+				<span class="n">curparams</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">x0</span>
+				<span class="n">v</span> <span class="o">=</span> <span class="n">func</span><span class="p">(</span><span class="n">curparams</span><span class="p">)</span>
+				<span class="n">cache</span><span class="o">.</span><span class="n">append</span><span class="p">([</span><span class="n">x0</span><span class="p">,</span> <span class="n">v</span><span class="p">])</span>
+				<span class="k">return</span> <span class="n">v</span>
+			<span class="n">lo</span><span class="p">,</span> <span class="n">hi</span> <span class="o">=</span> <span class="n">curlimits</span>
+			<span class="n">bestval</span> <span class="o">=</span> <span class="n">optimize</span><span class="p">(</span><span class="n">func1</span><span class="p">,</span> <span class="n">x0</span><span class="o">=</span><span class="n">p</span><span class="p">,</span>
+				<span class="n">cons</span><span class="o">=</span><span class="p">[</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">x</span> <span class="o">-</span> <span class="n">lo</span><span class="p">,</span> <span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">hi</span> <span class="o">-</span> <span class="n">x</span><span class="p">],</span> 
+				<span class="n">ftol</span><span class="o">=</span><span class="n">ftol</span><span class="p">,</span> <span class="n">disp</span><span class="o">=</span><span class="n">disp</span><span class="p">)</span>
+		
+			<span class="k">if</span> <span class="n">compute_errors</span><span class="p">:</span>
+				<span class="n">errors</span> <span class="o">=</span> <span class="n">cache2errors</span><span class="p">(</span><span class="n">func1</span><span class="p">,</span> <span class="n">cache</span><span class="p">,</span> <span class="n">disp</span><span class="o">=</span><span class="n">disp</span><span class="p">)</span>
+				<span class="k">return</span> <span class="n">bestval</span><span class="p">,</span> <span class="n">errors</span><span class="p">,</span> <span class="n">cache</span>
+			<span class="k">return</span> <span class="n">bestval</span><span class="p">,</span> <span class="n">cache</span>
+		<span class="n">results</span> <span class="o">=</span> <span class="n">parmap</span><span class="p">(</span><span class="n">run1d</span><span class="p">,</span> <span class="p">[(</span><span class="n">i</span><span class="p">,</span> <span class="n">numpy</span><span class="o">.</span><span class="n">copy</span><span class="p">(</span><span class="n">newparams</span><span class="p">),</span> <span class="n">limits</span><span class="p">[</span><span class="n">i</span><span class="p">])</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">k</span><span class="p">,</span> <span class="n">j</span><span class="p">)])</span>
+		<span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">r</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">results</span><span class="p">):</span>
+			<span class="k">if</span> <span class="n">compute_errors</span><span class="p">:</span>
+				<span class="n">v</span><span class="p">,</span> <span class="n">e</span><span class="p">,</span> <span class="n">c</span> <span class="o">=</span> <span class="n">r</span>
+				<span class="k">print</span> <span class="s">&#39;</span><span class="se">\t</span><span class="s">new value of </span><span class="si">%d</span><span class="s">: </span><span class="si">%e</span><span class="s"> [</span><span class="si">%e</span><span class="s"> .. </span><span class="si">%e</span><span class="s">]&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">v</span><span class="p">,</span> <span class="n">e</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">e</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+			<span class="k">else</span><span class="p">:</span>
+				<span class="n">v</span><span class="p">,</span> <span class="n">c</span> <span class="o">=</span> <span class="n">r</span>
+				<span class="n">e</span> <span class="o">=</span> <span class="p">[]</span>
+				<span class="k">print</span> <span class="s">&#39;</span><span class="se">\t</span><span class="s">new value of </span><span class="si">%d</span><span class="s">: </span><span class="si">%e</span><span class="s">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">v</span><span class="p">)</span>
+			<span class="n">newparams</span><span class="p">[</span><span class="n">i</span> <span class="o">+</span> <span class="n">k</span><span class="p">]</span> <span class="o">=</span> <span class="n">v</span>
+			<span class="n">caches</span><span class="p">[</span><span class="n">i</span> <span class="o">+</span> <span class="n">k</span><span class="p">]</span> <span class="o">=</span> <span class="n">c</span>
+			<span class="n">errors</span><span class="p">[</span><span class="n">i</span> <span class="o">+</span> <span class="n">k</span><span class="p">]</span> <span class="o">=</span> <span class="n">e</span>
+		
+		<span class="n">k</span> <span class="o">=</span> <span class="n">j</span>
+	<span class="n">beststat</span> <span class="o">=</span> <span class="n">func</span><span class="p">(</span><span class="n">newparams</span><span class="p">)</span>
+	<span class="k">print</span> <span class="s">&#39;optimization done, reached </span><span class="si">%.3f</span><span class="s">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">beststat</span><span class="p">)</span>
+	
+	<span class="k">if</span> <span class="n">compute_errors</span><span class="p">:</span>
+		<span class="k">return</span> <span class="n">newparams</span><span class="p">,</span> <span class="n">errors</span>
+	<span class="k">else</span><span class="p">:</span>
+		<span class="k">return</span> <span class="n">newparams</span>
+</pre></div></div>
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li><a href="../../index.html">jbopt 0.1 documentation</a> &raquo;</li>
+          <li><a href="../index.html" >Module code</a> &raquo;</li>
+          <li><a href="../jbopt.html" >jbopt</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright 2013, Johannes Buchner.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.1.3.
+    </div>
+  </body>
+</html>
