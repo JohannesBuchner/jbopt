@@ -34,6 +34,8 @@ def mcmc_advance(start, stdevs, logp, nsteps = 1e300, adapt=True, callback=None)
 	while len(chain) < nsteps:
 		i = i + 1
 		next = scipy.random.normal(prev, stdevs)
+		next[next > 1] = 1
+		next[next < 0] = 0
 		next_prob = logp(next)
 		assert not numpy.isnan(next).any()
 		assert not numpy.isnan(next_prob).any()
@@ -122,6 +124,8 @@ def ensemble(transform, loglikelihood, parameter_names, nsteps=40000, nburn=400,
 		numpy.random.seed(problem['seed'])
 	n_params = len(parameter_names)
 	nwalkers = 50 + n_params * 2
+	if nwalkers > 200:
+		nwalkers = 200
 	p0 = [numpy.random.rand(n_params) for i in xrange(nwalkers)]
 	start = start + numpy.zeros(n_params)
 	p0[0] = start
@@ -133,7 +137,8 @@ def ensemble(transform, loglikelihood, parameter_names, nsteps=40000, nburn=400,
 		params = transform(cube)
 		return loglikelihood(params)
 	
-	sampler = emcee.EnsembleSampler(nwalkers, n_params, like)
+	sampler = emcee.EnsembleSampler(nwalkers, n_params, like,
+		live_dangerously=True)
 
 	print 'burn-in...'
 	pos, prob, state = sampler.run_mcmc(p0, nburn / nwalkers)
@@ -157,8 +162,11 @@ def ensemble(transform, loglikelihood, parameter_names, nsteps=40000, nburn=400,
 	
 	final = chain[-1]
 	print 'postprocessing...'
-	chain = numpy.array([transform(params) for params in chain])
+	chain_post = numpy.array([transform(params) for params in chain])
+	chain_prob = sampler.flatlnprobability
 	
-	return dict(start=final, chain=chain, method='Ensemble MCMC')
+	return dict(start=final, chain=chain_post, chain_prior=chain,
+		chain_prob=chain_prob,
+		method='Ensemble MCMC')
 
 

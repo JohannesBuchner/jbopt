@@ -59,6 +59,9 @@ def escalate_left(function, a, b, va, vb, cons, lstep, ftol, disp, plot):
 		if va > vb or not has_curvature(a, b, c, va, vb, vc, ftol, disp): # finally, we found the border
 			if disp > 0: print ' found left border'
 			return [a, b, c], [va, vb, vc]
+		if lstep < 1e-4 and c - a < 1e-4 and numpy.abs(vb - va) < 1e-4:
+			if disp > 0: print ' WARNING: hit the lower limit of the parameter', lstep, a, b, va, vb
+			return [a, b, c], [va, vb, vc]
 	return [a, b, c], [va, vb, vc]
 def escalate_right(function, b, c, vb, vc, cons, rstep, ftol, disp, plot):
 	assert vc < vb, (vc, vb)
@@ -77,6 +80,9 @@ def escalate_right(function, b, c, vb, vc, cons, rstep, ftol, disp, plot):
 		if disp > 0: print '	right %f [%f]' % (c, vc)
 		if vc > vb: # finally, we found the border
 			if disp > 0: print ' found right border'
+			return [a, b, c], [va, vb, vc]
+		if rstep < 1e-4 and c - a < 1e-4 and numpy.abs(vc - vb) < 1e-4:
+			if disp > 0: print ' WARNING: hit the upper limit of the parameter', rstep, b, c, vb, vc
 			return [a, b, c], [va, vb, vc]
 	return [a, b, c], [va, vb, vc]
 
