@@ -109,19 +109,21 @@ def opt_grid(params, func, limits, ftol=0.01, disp=0, compute_errors=True):
 		lo, hi = limits[i]
 		bestval = optimize(func1, x0=p,
 			cons=[lambda x: x - lo, lambda x: hi - x], 
-			ftol=ftol, disp=disp)
-		
+			ftol=ftol, disp=disp - 1)
+		beststat = func1(bestval)
 		if compute_errors:
-			errors[i] = cache2errors(func1, cache, disp=disp)
+			errors[i] = cache2errors(func1, cache, disp=disp - 1)
 		
 		newparams[i] = bestval
 		caches[i] = cache
-		if compute_errors:
-			print '\tnew value of %d: %e [%e .. %e]' % (i, bestval, errors[i][0], errors[i][1])
-		else:
-			print '\tnew value of %d: %e' % (i, bestval)
+		if disp > 0:
+			if compute_errors:
+				print '\tnew value of %d: %e [%e .. %e] yielded %e' % (i, bestval, errors[i][0], errors[i][1], beststat)
+			else:
+				print '\tnew value of %d: %e yielded %e' % (i, bestval, beststat)
 	beststat = func(newparams)
-	print 'optimization done, reached %.3f' % (beststat)
+	if disp > 0:
+		print 'optimization done, reached %.3f' % (beststat)
 	
 	if compute_errors:
 		return newparams, errors
@@ -169,7 +171,7 @@ def opt_grid_parallel(params, func, limits, ftol=0.01, disp=0, compute_errors=Tr
 	indices = range(0, len(params), nthreads)
 	k = 0
 	while k < len(params):
-		j = min(len(params), k + nthreads)
+		j = min(len(params), k + nthreads * 2)
 		def run1d((i, curparams, curlimits)):
 			cache = []
 			def func1(x0):
@@ -180,28 +182,31 @@ def opt_grid_parallel(params, func, limits, ftol=0.01, disp=0, compute_errors=Tr
 			lo, hi = curlimits
 			bestval = optimize(func1, x0=p,
 				cons=[lambda x: x - lo, lambda x: hi - x], 
-				ftol=ftol, disp=disp)
-		
+				ftol=ftol, disp=disp - 1)
+			beststat = func1(bestval)
 			if compute_errors:
-				errors = cache2errors(func1, cache, disp=disp)
-				return bestval, errors, cache
-			return bestval, cache
+				errors = cache2errors(func1, cache, disp=disp - 1)
+				return bestval, beststat, errors, cache
+			return bestval, beststat, cache
 		results = parmap(run1d, [(i, numpy.copy(newparams), limits[i]) for i in range(k, j)])
 		for i, r in enumerate(results):
 			if compute_errors:
-				v, e, c = r
-				print '\tnew value of %d: %e [%e .. %e]' % (i, v, e[0], e[1])
+				v, s, e, c = r
+				if disp > 0:
+					print '\tnew value of %d: %e [%e .. %e] yielded %e' % (i + k, v, e[0], e[1], s)
 			else:
-				v, c = r
+				v, s, c = r
 				e = []
-				print '\tnew value of %d: %e' % (i, v)
+				if disp > 0:
+					print '\tnew value of %d: %e yielded %e' % (i + k, v, s)
 			newparams[i + k] = v
 			caches[i + k] = c
 			errors[i + k] = e
 		
 		k = j
 	beststat = func(newparams)
-	print 'optimization done, reached %.3f' % (beststat)
+	if disp > 0:
+		print 'optimization done, reached %e' % (beststat)
 	
 	if compute_errors:
 		return newparams, errors
