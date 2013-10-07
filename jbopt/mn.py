@@ -36,7 +36,7 @@ def multinest(parameter_names, transform, loglikelihood, output_basename, **prob
 		outputfiles_basename = output_basename,
 		resume = problem.get('resume', False), 
 		verbose = True,
-		n_live_points = problem.get('n_live_points', n_live_points),
+		n_live_points = problem.get('n_live_points', 400),
 		const_efficiency_mode = False)
 	if 'seed' in problem:
 		mn_args['seed'] = problem['seed']
@@ -59,7 +59,12 @@ def multinest(parameter_names, transform, loglikelihood, output_basename, **prob
 	stdev = (numpy.array(upper) - numpy.array(lower)) / 2
 	center = [m['median'] for m in s['marginals']]
 	
-	return dict(chain=chain, 
+	#final = a.get_best_fit()['parameters'] # is already transformed
+	data = numpy.loadtxt('%slive.points' % output_basename)
+	i = data[:,-1].argmax()
+	final = data[i,:-1] # untransformed
+
+	return dict(start=final, chain=chain,
 		stdev=stdev, upper=upper, lower=lower,
 		method='MultiNest')
 
